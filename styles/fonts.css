@@ -1,0 +1,10 @@
+@font-face {
+  font-family: 'NanumSquareRound';
+  src: url('https://cdn.jsdelivr.net/gh/moonspam/NanumSquareRound@latest/NanumSquareRoundB.woff') format('woff');
+  font-weight: 700;
+}
+@font-face {
+  font-family: 'NanumSquareRound';
+  src: url('https://cdn.jsdelivr.net/gh/moonspam/NanumSquareRound@latest/NanumSquareRoundEB.woff') format('woff');
+  font-weight: 800;
+}
