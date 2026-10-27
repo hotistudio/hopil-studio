@@ -791,3 +791,47 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
   .gs-pill-label{min-width:auto;font-size:10px}
   #gs-input{font-size:14px;padding:9px 12px}
 }
+
+/* 집필 화면: 참고 패널과 본문을 함께 볼 수 있도록 도구 영역을 간결하게 유지한다. */
+.editor-toolbar-spacer{flex:1;min-width:0}
+.editor-more{position:relative;flex-shrink:0}
+.editor-more summary{list-style:none;cursor:pointer;white-space:nowrap}
+.editor-more summary::-webkit-details-marker{display:none}
+.editor-more[open] summary{background:var(--gold-light);border-color:var(--gold);color:var(--gold)}
+.editor-more-actions{
+  position:absolute;right:0;top:calc(100% + 8px);z-index:310;
+  display:flex;align-items:center;flex-wrap:wrap;gap:6px;
+  width:max-content;max-width:min(340px,calc(100vw - 24px));
+  padding:10px;background:var(--white);border:1px solid var(--border);
+  border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12)
+}
+.editor-font-controls{display:flex;align-items:center;gap:3px;background:var(--cream);border:1px solid var(--border);border-radius:7px;padding:2px 6px}
+.editor-font-controls button{background:none;border:none;cursor:pointer;font-size:16px;color:var(--ink);padding:2px 5px;font-weight:700}
+.editor-font-controls span{font-size:12px;color:var(--ink);min-width:30px;text-align:center;font-weight:600}
+.editor-toolbar .wordcount,.chapter-item-meta{color:var(--ink)}
+
+@media(max-width:768px){
+  .editor-toolbar{padding:7px 10px;gap:6px}
+  .editor-toolbar #chapter-title-input{flex:1 1 120px;min-width:100px;width:auto !important}
+  .editor-toolbar select{width:82px !important}
+  .editor-toolbar-spacer{flex-basis:100%;height:0}
+  #shortcut-bar,#focus-shortcut-bar{
+    flex-wrap:nowrap !important;overflow-x:auto;overflow-y:hidden;
+    white-space:nowrap;scrollbar-width:thin
+  }
+  #shortcut-bar>* ,#focus-shortcut-bar>*{flex-shrink:0}
+  .editor-content{padding:18px 20px}
+  #focus-toolbar{padding:8px 12px;gap:8px;flex-wrap:wrap}
+  #focus-toolbar>div{min-width:0}
+  #focus-toolbar>div:last-child{flex:1;overflow-x:auto;white-space:nowrap;scrollbar-width:thin}
+  #focus-toolbar>div:last-child>*{flex-shrink:0}
+  #focus-editor-wrap{min-height:0;padding:20px 18px !important}
+  #focus-editor{height:100%;min-height:0}
+}
+@media(max-width:520px){
+  .editor-toolbar .btn{padding:6px 8px}
+  .editor-toolbar-spacer{flex-basis:100%}
+  .editor-more-actions{right:-2px}
+  #focus-toolbar>div:first-child{flex:0 0 100%}
+  #focus-editor-wrap{padding:14px 16px !important}
+}

@@ -3328,22 +3328,24 @@ function renderEditorContent(ch) {
             ${selOpts(CH_STATUSES, ch.status||'초안')}
           </select>
           <span class="wordcount" id="wc-display">${(ch.content||'').length.toLocaleString()}자</span>
-          <div style="flex:1"></div>
-          <button class="btn btn-outline btn-sm" onclick="toggleFindReplace()" id="find-replace-btn" title="찾기/바꾸기 (Ctrl+H)" style="font-size:13px">🔍 찾기</button>
+          <div class="editor-toolbar-spacer"></div>
           <button class="btn btn-outline btn-sm" onclick="toggleSplitPanel()" id="split-toggle-btn" title="참고 패널" style="font-size:12px">⊞ 참고</button>
           <button class="btn btn-outline btn-sm typewriter-toggle" onclick="toggleTypewriterScrolling()" aria-pressed="false" title="입력 중인 줄을 화면 가운데에 유지" style="font-size:12px">⌖ 타자기 스크롤</button>
-          <div style="display:flex;align-items:center;gap:3px;background:var(--cream);border:1px solid var(--border);border-radius:7px;padding:2px 6px">
-            <button onclick="changeFontSize(-1)" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--muted);padding:2px 3px;font-weight:700">−</button>
-            <span id="font-size-display" style="font-size:11px;color:var(--muted);min-width:28px;text-align:center;font-weight:600">16px</span>
-            <button onclick="changeFontSize(1)" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--muted);padding:2px 3px;font-weight:700">＋</button>
-          </div>
-          <button class="btn btn-outline btn-sm" onclick="togglePomodoro()" id="pomo-toolbar-btn" title="뽀모도로 타이머" style="font-size:13px">🍅 집필</button>
           <button class="btn btn-outline btn-sm" onclick="enterFocusMode()" title="집중 모드" style="font-size:13px">⛶ 집중</button>
-          <button class="btn btn-outline btn-sm" id="sym-toggle-btn" onclick="toggleSymbolPalette()" style="font-size:13px">✦ 기호</button>
-          <button class="btn btn-outline btn-sm" onclick="deleteChapter('${ch.id}')" style="color:var(--rust);border-color:rgba(181,69,27,.25)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            삭제
-          </button>
+          <details class="editor-more">
+            <summary class="btn btn-outline btn-sm" aria-label="추가 집필 도구">⋯ 도구</summary>
+            <div class="editor-more-actions">
+              <button class="btn btn-outline btn-sm" onclick="this.closest('details').open=false;toggleFindReplace()" id="find-replace-btn" title="찾기/바꾸기 (Ctrl+H)">🔍 찾기</button>
+              <div class="editor-font-controls">
+                <button onclick="changeFontSize(-1)" aria-label="글자 크기 줄이기">−</button>
+                <span id="font-size-display">16px</span>
+                <button onclick="changeFontSize(1)" aria-label="글자 크기 키우기">＋</button>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="this.closest('details').open=false;togglePomodoro()" id="pomo-toolbar-btn" title="뽀모도로 타이머">🍅 집필</button>
+              <button class="btn btn-outline btn-sm" id="sym-toggle-btn" onclick="this.closest('details').open=false;toggleSymbolPalette()">✦ 기호</button>
+              <button class="btn btn-outline btn-sm" onclick="this.closest('details').open=false;deleteChapter('${ch.id}')" style="color:var(--rust);border-color:rgba(181,69,27,.25)">삭제</button>
+            </div>
+          </details>
           <div class="symbol-palette" id="symbol-palette" style="display:none;flex-wrap:wrap;"></div>
         </div>
         <div id="shortcut-bar" style="padding:6px 12px;background:var(--cream);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:4px;flex-wrap:wrap;flex-shrink:0;"></div>
