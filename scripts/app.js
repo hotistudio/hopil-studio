@@ -1663,12 +1663,12 @@ function renderHome() {
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
         <p style="font-size:11px;color:var(--muted);opacity:.6;line-height:1.8">
-          호필 스튜디오 v0.6.05 beta · © 2026 호백<br>
+          호필 스튜디오 v0.6.12 beta · © 2026 호백<br>
           <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
             style="color:var(--muted);text-decoration:none;opacity:.8">CC BY-NC 4.0</a>
           · 비상업적 목적에 한해 자유롭게 사용 가능<br>
-          <a href="https://github.com/hotistudio/wnstudio" target="_blank"
-            style="color:var(--muted);text-decoration:none;opacity:.8">github.com/hotistudio/wnstudio</a>
+          <a href="https://github.com/hotistudio/hopil-studio" target="_blank"
+            style="color:var(--muted);text-decoration:none;opacity:.8">github.com/hotistudio/hopil-studio</a>
         </p>
       </div>
     </div>`;
