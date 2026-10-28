@@ -461,13 +461,17 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 .chapter-list-wrap .chapter-list.collapsed { width:0 !important; border:none !important; }
 .editor-area { flex:1; min-width:0; overflow:hidden; display:flex; flex-direction:column; }
 #split-panel {
-  width:360px; flex-shrink:0; border-left:1.5px solid var(--border);
+  width:360px; flex-shrink:0; position:relative; border-left:1.5px solid var(--border);
   background:var(--paper); display:flex; flex-direction:column;
-  overflow:hidden; transition:all .2s;
+  overflow:hidden;
 }
+.split-resizer{position:absolute;left:0;top:0;bottom:0;width:10px;z-index:5;
+  cursor:col-resize;touch-action:none;background:transparent}
+.split-resizer:hover,.split-resizer:focus-visible{background:var(--gold-light);outline:none}
 #split-panel.hidden { display:none !important; }
 .split-panel-close-btn { display:block !important; }
 @media (max-width: 768px) {
+  .split-resizer{display:none}
   #split-panel {
     position:fixed !important;
     top:0; right:0; bottom:0;

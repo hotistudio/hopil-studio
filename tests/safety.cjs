@@ -79,6 +79,37 @@ async function main() {
   assert.equal(JSON.parse(oldStore.get('wnstudio_v1'))[0].title, '이전 원고');
   assert.equal(JSON.parse(oldStore.get('hopil_studio_projects_v1'))[0].title, '새 원고');
 
+  let badgeUpdates = 0;
+  const saveStatus = vm.createContext({
+    saveToStorage: () => false,
+    updateBadges: () => { badgeUpdates++; }
+  });
+  vm.runInContext(section('function autoSave()', '// ═══════════════════════════════════════════════════════════════'), saveStatus);
+  assert.equal(vm.runInContext('autoSave()', saveStatus), false);
+  assert.equal(badgeUpdates, 1);
+
+  let shouldSave = false;
+  let saveIndicator = null;
+  const saveHost = { parentNode: { insertBefore(el) { saveIndicator = el; } } };
+  const indicatorContext = vm.createContext({
+    window: { autoSave: () => shouldSave },
+    document: {
+      getElementById: id => id === 'save-indicator' ? saveIndicator : saveHost,
+      createElement: () => ({ style: {}, textContent: '' })
+    },
+    setInterval() {}, Date
+  });
+  const extension = fs.readFileSync('scripts/extension-02.js', 'utf8');
+  const indicatorStart = extension.indexOf('  // ─── 저장 상태 인디케이터');
+  const indicatorEnd = extension.indexOf('  // ─── 제목/상태', indicatorStart);
+  assert(indicatorStart >= 0 && indicatorEnd > indicatorStart);
+  vm.runInContext(extension.slice(indicatorStart, indicatorEnd), indicatorContext);
+  assert.equal(vm.runInContext('window.autoSave()', indicatorContext), false);
+  assert.match(saveIndicator.textContent, /저장 실패/);
+  shouldSave = true;
+  assert.equal(vm.runInContext('window.autoSave()', indicatorContext), true);
+  assert.match(saveIndicator.textContent, /브라우저에 저장됨/);
+
   const imports = vm.createContext({});
   vm.runInContext(section('const MAX_IMPORT_BYTES', 'function importSingleProject'), imports);
   const validate = vm.runInContext('validateImportedProject', imports);

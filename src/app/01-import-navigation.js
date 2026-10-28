@@ -438,6 +438,10 @@ function toast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
 }
-function autoSave() { saveToStorage(); updateBadges(); }
+function autoSave() {
+  const savedLocally = saveToStorage();
+  updateBadges();
+  return savedLocally;
+}
 
 // ═══════════════════════════════════════════════════════════════

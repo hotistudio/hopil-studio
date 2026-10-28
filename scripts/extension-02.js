@@ -229,12 +229,15 @@
 
   // ─── 저장 상태 인디케이터 ───────────────────────────────────────
   let _lastSaveAt = null;
+  let _saveFailed = false;
 
   const _origAutoSave = window.autoSave;
   window.autoSave = function () {
-    _origAutoSave.apply(this, arguments);
-    _lastSaveAt = Date.now();
+    const savedLocally = _origAutoSave.apply(this, arguments);
+    _saveFailed = savedLocally === false;
+    if (!_saveFailed) _lastSaveAt = Date.now();
     renderSaveIndicator();
+    return savedLocally;
   };
 
   function formatSaveAgo(ms) {
@@ -254,9 +257,15 @@
       el.style.cssText = 'font-size:11px;color:var(--teal2);margin-right:6px;white-space:nowrap';
       host.parentNode.insertBefore(el, host);
     }
+    if (_saveFailed) {
+      el.textContent = '⚠️ 브라우저 저장 실패';
+      el.style.color = 'var(--rust)';
+      return;
+    }
+    el.style.color = 'var(--teal2)';
     if (_lastSaveAt == null) { el.textContent = ''; return; }
     const ago = Date.now() - _lastSaveAt;
-    el.innerHTML = '<span style="opacity:.7">저장됨 · ' + formatSaveAgo(ago) + '</span>';
+    el.textContent = '브라우저에 저장됨 · ' + formatSaveAgo(ago);
   }
 
   setInterval(renderSaveIndicator, 30 * 1000);

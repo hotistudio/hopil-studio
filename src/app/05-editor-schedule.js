@@ -125,6 +125,8 @@ function renderChapters() {
     return `<option value="${c.id}" ${c.id===activeChapterId?'selected':''}>${prefix}${esc(c.title)}</option>`;
   }).join('');
 
+  const prevScroll = document.getElementById('chapter-list-body')?.scrollTop || 0;
+  const prevMobileScroll = document.getElementById('mobile-chapter-list-body')?.scrollTop || 0;
   document.getElementById('main').innerHTML = `
     <div class="editor-wrap">
       <!-- 모바일 화 선택바 -->
@@ -164,10 +166,9 @@ function renderChapters() {
           </div>`}
       </div>
     </div>`;
-  const prevScroll = document.getElementById('chapter-list-body')?.scrollTop || 0;
-  const prevMobileScroll = document.getElementById('mobile-chapter-list-body')?.scrollTop || 0;
+  applyChapterListCollapsed();
   setTimeout(() => {
-    refreshShortcutBar(); applyEditorFontSize(); initChDrag(); initAllDragScrolls();
+    refreshShortcutBar(); applyEditorFontSize(); initChDrag(); initAllDragScrolls(); initSplitPanelResize();
     if (typeof updateTypewriterButtons === 'function') updateTypewriterButtons();
     const listBody = document.getElementById('chapter-list-body');
     if (listBody) listBody.scrollTop = prevScroll;
@@ -252,6 +253,7 @@ function renderEditorContent(ch) {
       </div>
       <!-- 오른쪽: 참고 패널 -->
       <div id="split-panel" class="hidden" style="display:flex;flex-direction:column;">
+        <div class="split-resizer" role="separator" tabindex="0" aria-label="참고 패널 너비 조절" aria-orientation="vertical" title="드래그하여 참고 패널 너비 조절"></div>
         <div class="split-panel-tabs" id="split-tabs" style="overflow-x:auto;flex-wrap:nowrap;display:flex;align-items:center">
           <div style="display:flex;flex:1;overflow-x:auto;flex-wrap:nowrap">
             <button class="split-tab active" onclick="switchSplitTab('overview')">📋 개요</button>
@@ -292,6 +294,64 @@ function renderEditorContent(ch) {
       </div>
     </div>`;
 }
+
+const SPLIT_WIDTH_KEY = 'hopil_studio_reference_width';
+
+function setSplitPanelWidth(width, persist = false) {
+  const panel = document.getElementById('split-panel');
+  const wrap = panel?.closest('.editor-wrap');
+  if (!panel || !wrap || window.innerWidth <= 768) return;
+  const listWidth = document.getElementById('chapter-list-wrap')?.getBoundingClientRect().width || 0;
+  const maxWidth = Math.max(220, Math.min(600, wrap.clientWidth - listWidth - 300));
+  const nextWidth = Math.max(220, Math.min(width, maxWidth));
+  panel.style.width = nextWidth + 'px';
+  if (persist) {
+    try { localStorage.setItem(SPLIT_WIDTH_KEY, String(nextWidth)); } catch (_) {}
+  }
+}
+
+function initSplitPanelResize() {
+  const panel = document.getElementById('split-panel');
+  const handle = panel?.querySelector('.split-resizer');
+  if (!panel || !handle) return;
+  if (window.innerWidth <= 768) { panel.style.removeProperty('width'); return; }
+  let savedWidth = 360;
+  try { savedWidth = Number(localStorage.getItem(SPLIT_WIDTH_KEY)) || 360; } catch (_) {}
+  setSplitPanelWidth(savedWidth);
+  if (handle.dataset.resizeReady) return;
+  handle.dataset.resizeReady = 'true';
+  let startX = 0;
+  let startWidth = 0;
+  handle.addEventListener('pointerdown', event => {
+    startX = event.clientX;
+    startWidth = panel.getBoundingClientRect().width;
+    handle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  handle.addEventListener('pointermove', event => {
+    if (!handle.hasPointerCapture(event.pointerId)) return;
+    setSplitPanelWidth(startWidth + startX - event.clientX);
+  });
+  handle.addEventListener('pointerup', event => {
+    if (!handle.hasPointerCapture(event.pointerId)) return;
+    handle.releasePointerCapture(event.pointerId);
+    setSplitPanelWidth(panel.getBoundingClientRect().width, true);
+  });
+  handle.addEventListener('keydown', event => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    setSplitPanelWidth(panel.getBoundingClientRect().width + (event.key === 'ArrowLeft' ? 20 : -20), true);
+    event.preventDefault();
+  });
+}
+
+window.addEventListener('resize', () => {
+  if (window.innerWidth <= 768) return;
+  const panel = document.getElementById('split-panel');
+  if (panel && !panel.classList.contains('hidden')) {
+    if (window.innerWidth <= 1024) setChapterListCollapsed(true);
+    setSplitPanelWidth(panel.getBoundingClientRect().width);
+  }
+});
 
 function toggleChapterMemo() {
   const body = document.getElementById('ch-memo-body');

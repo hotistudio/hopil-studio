@@ -4,6 +4,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync('scripts/typewriter-scroll.js', 'utf8');
 const saved = new Map();
+let mirrorAppends = 0;
 const buttons = Array.from({ length: 2 }, () => ({
   attributes: {},
   setAttribute(key, value) { this.attributes[key] = value; }
@@ -16,7 +17,7 @@ const editor = {
 };
 const document = {
   activeElement: editor,
-  body: { appendChild() {} },
+  body: { appendChild() { mirrorAppends++; } },
   querySelectorAll: () => buttons,
   querySelector: () => null,
   getElementById: () => editor,
@@ -48,6 +49,8 @@ vm.runInContext('toggleTypewriterScrolling()', context);
 assert.equal(saved.get('hopil_studio_typewriter_scroll'), 'true');
 assert(buttons.every(button => button.attributes['aria-pressed'] === 'true'));
 assert.equal(editor.scrollTop, 130);
+vm.runInContext('scrollTypewriterCaret(document.activeElement)', context);
+assert.equal(mirrorAppends, 1);
 vm.runInContext('toggleTypewriterScrolling()', context);
 assert(buttons.every(button => button.attributes['aria-pressed'] === 'false'));
 console.log('Typewriter toggle, persistence, and caret positioning passed.');

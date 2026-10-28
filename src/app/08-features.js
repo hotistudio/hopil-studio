@@ -2627,10 +2627,14 @@ function frScrollTo() {
   const q = document.getElementById('fr-find')?.value || '';
   ta.focus();
   ta.setSelectionRange(pos, pos + q.length);
-  // 해당 위치로 스크롤
-  const lineHeight = parseInt(getComputedStyle(ta).lineHeight) || 24;
-  const lines = ta.value.substring(0, pos).split('\n').length;
-  ta.scrollTop = (lines - 3) * lineHeight;
+  // 실제 줄바꿈 높이를 측정해 긴 문장 안의 검색 결과도 정확히 보여준다.
+  if (typeof getTextareaCaretTop === 'function') {
+    const caretTop = getTextareaCaretTop(ta, pos);
+    ta.scrollTop = Math.max(0, Math.min(
+      caretTop - ta.clientHeight * 0.35,
+      ta.scrollHeight - ta.clientHeight
+    ));
+  }
 }
 
 function frUpdateCount() {

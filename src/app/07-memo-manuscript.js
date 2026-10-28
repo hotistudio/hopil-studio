@@ -797,6 +797,8 @@ function toggleSplitPanel() {
   const isHidden = panel.classList.contains('hidden');
   if (isHidden) {
     panel.classList.remove('hidden');
+    if (!isMobile && window.innerWidth <= 1024) setChapterListCollapsed(true);
+    if (!isMobile) initSplitPanelResize();
     if (btn) { btn.style.background='var(--gold-light)'; btn.style.borderColor='var(--gold)'; btn.style.color='var(--gold)'; btn.textContent='⊠ 참고'; }
     if (isMobile) {
       let bd = document.getElementById('split-panel-backdrop');
@@ -1434,12 +1436,26 @@ function deleteSplitMemo(idx) {
 }
 
 
-function toggleChapterList() {
+let chapterListCollapsed = false;
+
+function applyChapterListCollapsed() {
   const list = document.getElementById('chapter-list');
   const btn  = document.getElementById('chapter-collapse-btn');
   if (!list || !btn) return;
-  const collapsed = list.classList.toggle('collapsed');
-  btn.textContent = collapsed ? '▶' : '◀';
+  list.classList.toggle('collapsed', chapterListCollapsed);
+  btn.textContent = chapterListCollapsed ? '▶' : '◀';
+  btn.setAttribute('aria-label', chapterListCollapsed ? '회차 목록 펼치기' : '회차 목록 접기');
+}
+
+function setChapterListCollapsed(collapsed) {
+  chapterListCollapsed = collapsed;
+  applyChapterListCollapsed();
+  const panel = document.getElementById('split-panel');
+  if (panel && !panel.classList.contains('hidden')) setSplitPanelWidth(panel.getBoundingClientRect().width);
+}
+
+function toggleChapterList() {
+  setChapterListCollapsed(!chapterListCollapsed);
 }
 
 
