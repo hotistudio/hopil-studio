@@ -2,8 +2,8 @@
 // ═══════════════════════════════════════════════════════════════
 async function exportAllProjects() {
   if (state.projects.length === 0) { toast('저장할 작품이 없어요.'); return; }
-  const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
-  const filename = '호필스튜디오_전체백업_' + new Date().toISOString().slice(0,10) + '.json';
+  const data = { projects: state.projects, ...statsBackup(), version: '2.1', savedAt: new Date().toISOString() };
+  const filename = '호필스튜디오_전체백업_' + getTodayStr() + '.json';
   _downloadJson(data, filename);
   toast('전체 저장 완료! ' + state.projects.length + '개 작품 💾');
 }
@@ -14,7 +14,7 @@ async function exportCurrentProject() {
   if (FS_SUPPORTED) {
     try {
       if (fileHandles.projects[p.id]) {
-        const ok = await writeToFileHandle(fileHandles.projects[p.id], p);
+        const ok = await writeToFileHandle(fileHandles.projects[p.id], projectBackup(p));
         if (ok) { toast(`"${p.title||'작품'}" 저장 완료 💾`); return; }
       }
       const handle = await window.showSaveFilePicker({
@@ -22,17 +22,17 @@ async function exportCurrentProject() {
         types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
       });
       fileHandles.projects[p.id] = handle;
-      const ok = await writeToFileHandle(handle, p);
+      const ok = await writeToFileHandle(handle, projectBackup(p));
       if (!ok) return;
       toast(`파일 연결 완료! 이후 자동으로 같은 파일에 저장됩니다 💾`);
       updateFileStatus();
     } catch(e) {
       if (e.name !== 'AbortError') {
-        _downloadJson(p, (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json');
+        _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
       }
     }
   } else {
-    _downloadJson(p, (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json');
+    _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
     toast(`"${p.title||'작품'}" 백업 저장 완료 📦`);
   }
 }
@@ -43,7 +43,7 @@ async function exportSingleProject(pid) {
   if (FS_SUPPORTED) {
     try {
       if (fileHandles.projects[pid]) {
-        const ok = await writeToFileHandle(fileHandles.projects[pid], p);
+        const ok = await writeToFileHandle(fileHandles.projects[pid], projectBackup(p));
         if (ok) { toast(`"${p.title||'작품'}" 저장 완료 💾`); return; }
       }
       const handle = await window.showSaveFilePicker({
@@ -51,17 +51,17 @@ async function exportSingleProject(pid) {
         types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
       });
       fileHandles.projects[pid] = handle;
-      const ok = await writeToFileHandle(handle, p);
+      const ok = await writeToFileHandle(handle, projectBackup(p));
       if (!ok) return;
       toast(`"${p.title||'작품'}" 파일 연결 완료! 💾`);
       updateFileStatus();
     } catch(e) {
       if (e.name !== 'AbortError') {
-        _downloadJson(p, (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json');
+        _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
       }
     }
   } else {
-    _downloadJson(p, (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json');
+    _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
     toast(`"${p.title||'작품'}" 저장 완료 📁`);
   }
 }
@@ -165,12 +165,12 @@ function importSingleProject(e) {
           if (idx !== -1) {
             confirmDialog(`"${proj.title||'작품'}"이 이미 있어요. 덮어쓸까요?`, () => {
               state.projects[idx] = proj;
-              storageLoadFailed = false; saveToStorage(); renderHome();
+              storageLoadFailed = false; saveToStorage(); restoreStats(data, [proj.id]); renderHome();
               toast(`"${proj.title||'작품'}" 불러오기 완료 📖`);
             });
           } else {
             state.projects.push(proj);
-            storageLoadFailed = false; saveToStorage(); renderHome();
+            storageLoadFailed = false; saveToStorage(); restoreStats(data, [proj.id]); renderHome();
             toast(`"${proj.title||'작품'}" 불러오기 완료 📖`);
           }
         } else {
@@ -181,21 +181,22 @@ function importSingleProject(e) {
       }
 
       // 단일 작품 형식인지 확인
-      if (!data.id && !data.title && !data.chapters) {
+      const imported = data.project || data;
+      if (!imported.id && !imported.title && !imported.chapters) {
         toast('올바른 작품 파일이 아니에요.'); return;
       }
-      const proj = { ...validateImportedProject(data), id: data.id || uid() };
+      const proj = { ...validateImportedProject(imported), id: imported.id || uid() };
       // 같은 id가 있으면 덮어쓰기, 없으면 추가
       const idx = state.projects.findIndex(p => p.id === proj.id);
       if (idx !== -1) {
         confirmDialog(`"${proj.title||'작품'}"이 이미 있어요. 덮어쓸까요?`, () => {
           state.projects[idx] = proj;
-          storageLoadFailed = false; saveToStorage(); renderHome();
+          storageLoadFailed = false; saveToStorage(); restoreStats(data, [proj.id]); renderHome();
           toast(`"${proj.title||'작품'}" 불러오기 완료 📖`);
         });
       } else {
         state.projects.push(proj);
-        storageLoadFailed = false; saveToStorage(); renderHome();
+        storageLoadFailed = false; saveToStorage(); restoreStats(data, [proj.id]); renderHome();
         toast(`"${proj.title||'작품'}" 불러오기 완료 📖`);
       }
     } catch(err) { toast(err.message || '파일을 읽을 수 없어요.'); }
@@ -222,7 +223,7 @@ function importData(e) {
         const doImport = () => {
           state.projects = cleaned.map(p => ({ ...p, id: p.id || uid() }));
           fileHandles.all = null; fileHandles.projects = {};
-          storageLoadFailed = false; saveToStorage();
+          storageLoadFailed = false; saveToStorage(); restoreStats(data, state.projects.map(p => p.id), true);
           renderHome();
           toast('불러오기 완료! ' + cleaned.length + '개 작품 📖');
         };
@@ -237,13 +238,13 @@ function importData(e) {
         return;
       }
       // 단일 작품 처리
-      validateImportedProject(data);
-      if (!data.id) data.id = uid();
-      const exists = state.projects.findIndex(p => p.id === data.id);
-      if (exists >= 0) state.projects[exists] = data;
-      else state.projects.push(data);
+      const imported = validateImportedProject(data.project || data);
+      const project = { ...imported, id: imported.id || uid() };
+      const exists = state.projects.findIndex(p => p.id === project.id);
+      if (exists >= 0) state.projects[exists] = project;
+      else state.projects.push(project);
       fileHandles.all = null; fileHandles.projects = {};
-      storageLoadFailed = false; saveToStorage();
+      storageLoadFailed = false; saveToStorage(); restoreStats(data, [project.id]);
       toast('불러오기 완료! 📖');
       renderHome();
     } catch(err) { toast(err.message || '파일을 읽을 수 없습니다.'); }

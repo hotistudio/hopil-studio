@@ -61,13 +61,13 @@ function saveToStorage() {
   }
   // 전체 파일 핸들이 연결되어 있으면 덮어쓰기
   if (fileHandles.all) {
-    const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
+    const data = { projects: state.projects, ...statsBackup(), version: '2.1', savedAt: new Date().toISOString() };
     void writeToFileHandle(fileHandles.all, data);
   }
   // 활성 작품 파일 핸들이 연결되어 있으면 덮어쓰기
   if (state.activeProjectId && fileHandles.projects[state.activeProjectId]) {
     const p = getProject();
-    if (p) void writeToFileHandle(fileHandles.projects[state.activeProjectId], p);
+    if (p) void writeToFileHandle(fileHandles.projects[state.activeProjectId], projectBackup(p));
   }
   return savedLocally;
 }

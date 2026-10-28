@@ -61,13 +61,13 @@ function saveToStorage() {
   }
   // 전체 파일 핸들이 연결되어 있으면 덮어쓰기
   if (fileHandles.all) {
-    const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
+    const data = { projects: state.projects, ...statsBackup(), version: '2.1', savedAt: new Date().toISOString() };
     void writeToFileHandle(fileHandles.all, data);
   }
   // 활성 작품 파일 핸들이 연결되어 있으면 덮어쓰기
   if (state.activeProjectId && fileHandles.projects[state.activeProjectId]) {
     const p = getProject();
-    if (p) void writeToFileHandle(fileHandles.projects[state.activeProjectId], p);
+    if (p) void writeToFileHandle(fileHandles.projects[state.activeProjectId], projectBackup(p));
   }
   return savedLocally;
 }
@@ -1142,8 +1142,8 @@ function ftSetupPanZoom() {
 // ═══════════════════════════════════════════════════════════════
 async function exportAllProjects() {
   if (state.projects.length === 0) { toast('저장할 작품이 없어요.'); return; }
-  const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
-  const filename = '호필스튜디오_전체백업_' + new Date().toISOString().slice(0,10) + '.json';
+  const data = { projects: state.projects, ...statsBackup(), version: '2.1', savedAt: new Date().toISOString() };
+  const filename = '호필스튜디오_전체백업_' + getTodayStr() + '.json';
   _downloadJson(data, filename);
   toast('전체 저장 완료! ' + state.projects.length + '개 작품 💾');
 }
@@ -1154,7 +1154,7 @@ async function exportCurrentProject() {
   if (FS_SUPPORTED) {
     try {
       if (fileHandles.projects[p.id]) {
-        const ok = await writeToFileHandle(fileHandles.projects[p.id], p);
+        const ok = await writeToFileHandle(fileHandles.projects[p.id], projectBackup(p));
         if (ok) { toast(`"${p.title||'작품'}" 저장 완료 💾`); return; }
       }
       const handle = await window.showSaveFilePicker({
@@ -1162,17 +1162,17 @@ async function exportCurrentProject() {
         types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
       });
       fileHandles.projects[p.id] = handle;
-      const ok = await writeToFileHandle(handle, p);
+      const ok = await writeToFileHandle(handle, projectBackup(p));
       if (!ok) return;
       toast(`파일 연결 완료! 이후 자동으로 같은 파일에 저장됩니다 💾`);
       updateFileStatus();
     } catch(e) {
       if (e.name !== 'AbortError') {
-        _downloadJson(p, (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json');
+        _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
       }
     }
   } else {
-    _downloadJson(p, (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json');
+    _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
     toast(`"${p.title||'작품'}" 백업 저장 완료 📦`);
   }
 }
@@ -1183,7 +1183,7 @@ async function exportSingleProject(pid) {
   if (FS_SUPPORTED) {
     try {
       if (fileHandles.projects[pid]) {
-        const ok = await writeToFileHandle(fileHandles.projects[pid], p);
+        const ok = await writeToFileHandle(fileHandles.projects[pid], projectBackup(p));
         if (ok) { toast(`"${p.title||'작품'}" 저장 완료 💾`); return; }
       }
       const handle = await window.showSaveFilePicker({
@@ -1191,17 +1191,17 @@ async function exportSingleProject(pid) {
         types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
       });
       fileHandles.projects[pid] = handle;
-      const ok = await writeToFileHandle(handle, p);
+      const ok = await writeToFileHandle(handle, projectBackup(p));
       if (!ok) return;
       toast(`"${p.title||'작품'}" 파일 연결 완료! 💾`);
       updateFileStatus();
     } catch(e) {
       if (e.name !== 'AbortError') {
-        _downloadJson(p, (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json');
+        _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
       }
     }
   } else {
-    _downloadJson(p, (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json');
+    _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
     toast(`"${p.title||'작품'}" 저장 완료 📁`);
   }
 }
@@ -1305,12 +1305,12 @@ function importSingleProject(e) {
           if (idx !== -1) {
             confirmDialog(`"${proj.title||'작품'}"이 이미 있어요. 덮어쓸까요?`, () => {
               state.projects[idx] = proj;
-              storageLoadFailed = false; saveToStorage(); renderHome();
+              storageLoadFailed = false; saveToStorage(); restoreStats(data, [proj.id]); renderHome();
               toast(`"${proj.title||'작품'}" 불러오기 완료 📖`);
             });
           } else {
             state.projects.push(proj);
-            storageLoadFailed = false; saveToStorage(); renderHome();
+            storageLoadFailed = false; saveToStorage(); restoreStats(data, [proj.id]); renderHome();
             toast(`"${proj.title||'작품'}" 불러오기 완료 📖`);
           }
         } else {
@@ -1321,21 +1321,22 @@ function importSingleProject(e) {
       }
 
       // 단일 작품 형식인지 확인
-      if (!data.id && !data.title && !data.chapters) {
+      const imported = data.project || data;
+      if (!imported.id && !imported.title && !imported.chapters) {
         toast('올바른 작품 파일이 아니에요.'); return;
       }
-      const proj = { ...validateImportedProject(data), id: data.id || uid() };
+      const proj = { ...validateImportedProject(imported), id: imported.id || uid() };
       // 같은 id가 있으면 덮어쓰기, 없으면 추가
       const idx = state.projects.findIndex(p => p.id === proj.id);
       if (idx !== -1) {
         confirmDialog(`"${proj.title||'작품'}"이 이미 있어요. 덮어쓸까요?`, () => {
           state.projects[idx] = proj;
-          storageLoadFailed = false; saveToStorage(); renderHome();
+          storageLoadFailed = false; saveToStorage(); restoreStats(data, [proj.id]); renderHome();
           toast(`"${proj.title||'작품'}" 불러오기 완료 📖`);
         });
       } else {
         state.projects.push(proj);
-        storageLoadFailed = false; saveToStorage(); renderHome();
+        storageLoadFailed = false; saveToStorage(); restoreStats(data, [proj.id]); renderHome();
         toast(`"${proj.title||'작품'}" 불러오기 완료 📖`);
       }
     } catch(err) { toast(err.message || '파일을 읽을 수 없어요.'); }
@@ -1362,7 +1363,7 @@ function importData(e) {
         const doImport = () => {
           state.projects = cleaned.map(p => ({ ...p, id: p.id || uid() }));
           fileHandles.all = null; fileHandles.projects = {};
-          storageLoadFailed = false; saveToStorage();
+          storageLoadFailed = false; saveToStorage(); restoreStats(data, state.projects.map(p => p.id), true);
           renderHome();
           toast('불러오기 완료! ' + cleaned.length + '개 작품 📖');
         };
@@ -1377,13 +1378,13 @@ function importData(e) {
         return;
       }
       // 단일 작품 처리
-      validateImportedProject(data);
-      if (!data.id) data.id = uid();
-      const exists = state.projects.findIndex(p => p.id === data.id);
-      if (exists >= 0) state.projects[exists] = data;
-      else state.projects.push(data);
+      const imported = validateImportedProject(data.project || data);
+      const project = { ...imported, id: imported.id || uid() };
+      const exists = state.projects.findIndex(p => p.id === project.id);
+      if (exists >= 0) state.projects[exists] = project;
+      else state.projects.push(project);
       fileHandles.all = null; fileHandles.projects = {};
-      storageLoadFailed = false; saveToStorage();
+      storageLoadFailed = false; saveToStorage(); restoreStats(data, [project.id]);
       toast('불러오기 완료! 📖');
       renderHome();
     } catch(err) { toast(err.message || '파일을 읽을 수 없습니다.'); }
@@ -1874,7 +1875,7 @@ function renderOverview() {
             : '—';
           const allStats = (() => { try { return JSON.parse(localStorage.getItem('hopil_studio_writing_stats')||'{}'); } catch(e) { return {}; } })();
           const pStats = allStats[p.id] || {};
-          const todayKey = new Date().toISOString().slice(0,10);
+          const todayKey = getTodayStr();
           const todayCount = pStats[todayKey] || 0;
           return [
             {label:'집필 요일', val:routineStr, unit:'', color:'var(--gold)', small: routineDays.length > 4},
@@ -3379,7 +3380,7 @@ function renderEditorContent(ch) {
         </div>
         <div class="editor-content" style="flex:1;overflow-y:auto;">
           <textarea id="prose-editor" placeholder="이야기를 시작하세요..."
-            oninput="onEditorInput('${ch.id}',this.value)">${esc(ch.content||'')}</textarea>
+            oninput="onEditorInput('${ch.id}',this.value,event)">${esc(ch.content||'')}</textarea>
         </div>
       </div>
       <!-- 오른쪽: 참고 패널 -->
@@ -3503,17 +3504,18 @@ function updateChapterMemo(chId, val) {
   window._chMemoTimer = setTimeout(autoSave, 600);
 }
 
-function onEditorInput(id, val) {
+function onEditorInput(id, val, inputEvent) {
   const p = getProject();
   const ch = p.chapters.find(c => c.id === id);
   if (!ch) return;
-  const prevLen = (ch.content || '').length;
+  const previous = ch.content || '';
   ch.content = val;
   const wc = document.getElementById('wc-display');
   if (wc) wc.textContent = val.length.toLocaleString() + '자';
   // 날짜별 집필량 기록
-  const diff = val.length - prevLen;
+  const diff = writtenCharDelta(previous, val, inputEvent);
   if (diff > 0) recordDailyWriting(diff);
+  if (diff > 0) onTypingKey();
   // debounce save
   clearTimeout(window._saveTimer);
   window._saveTimer = setTimeout(() => { autoSave(); updateChapterListItem(ch); }, 800);
@@ -6865,13 +6867,15 @@ function enterFocusMode() {
   }
 
   // 입력 이벤트
-  focusEditor.oninput = () => {
+  focusEditor.oninput = event => {
     updateFocusWordCount();
     // 원본에도 즉시 반영
     const p2 = getProject();
     const ch2 = (p2?.chapters||[]).find(c => c.id === focusChapterId);
     if (ch2) {
+      const diff = writtenCharDelta(ch2.content || '', focusEditor.value, event);
       ch2.content = focusEditor.value;
+      if (diff > 0) { recordDailyWriting(diff); onTypingKey(); }
       autoSave();
     }
   };
@@ -8054,7 +8058,7 @@ function changeFontSize(delta) {
 // Ctrl+S 시 호출 — fileHandles 시스템 사용
 async function fsSaveToLocal(projectData) {
   const isProject = !!projectData;
-  const data = isProject ? projectData : { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
+  const data = isProject ? projectBackup(projectData) : { projects: state.projects, ...statsBackup(), version: '2.1', savedAt: new Date().toISOString() };
   const suggestedName = isProject ? (projectData.title || '호필스튜디오') + '.json' : '호필스튜디오_전체.json';
 
   if (FS_SUPPORTED) {
@@ -8180,14 +8184,51 @@ function showGroupColorPicker(groupName, btnEl) {
 // ═══════════════════════════════════════════════════════════════
 const STATS_KEY = 'hopil_studio_writing_stats';
 
-function getTodayStr() {
-  return new Date().toISOString().slice(0, 10);
+function getTodayStr(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
 function loadStats() {
   try { return JSON.parse(localStorage.getItem(STATS_KEY) || '{}'); } catch(e) { return {}; }
 }
 function saveStats(s) {
   try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch(e) {}
+}
+function cleanImportedStats(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const cleaned = Object.create(null);
+  for (const [pid, days] of Object.entries(value)) {
+    if (!/^[\w.-]+$/.test(pid) || !days || typeof days !== 'object' || Array.isArray(days)) continue;
+    const validDays = Object.create(null);
+    for (const [day, amount] of Object.entries(days)) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(day) && Number.isFinite(amount) && amount >= 0) validDays[day] = amount;
+    }
+    cleaned[pid] = validDays;
+  }
+  return cleaned;
+}
+function statsBackup(projectId) {
+  const writing = cleanImportedStats(loadStats());
+  const typing = cleanImportedStats(loadTypingStats());
+  if (!projectId) return { writingStats: writing, typingStats: typing };
+  return { writingStats: { [projectId]: writing[projectId] || {} }, typingStats: { [projectId]: typing[projectId] || {} } };
+}
+function projectBackup(project) {
+  return { project, ...statsBackup(project.id), version: '2.1', savedAt: new Date().toISOString() };
+}
+function restoreStats(data, projectIds, replaceAll = false) {
+  const ids = new Set(projectIds);
+  for (const [key, incoming] of [[STATS_KEY, data.writingStats], [TYPING_STATS_KEY, data.typingStats]]) {
+    if (incoming === undefined) continue; // 예전 백업에는 통계가 없다.
+    const current = replaceAll ? {} : cleanImportedStats(key === STATS_KEY ? loadStats() : loadTypingStats());
+    const restored = cleanImportedStats(incoming);
+    for (const id of ids) if (Object.prototype.hasOwnProperty.call(restored, id)) current[id] = restored[id];
+    try { localStorage.setItem(key, JSON.stringify(current)); } catch(e) { toast('⚠️ 집필 통계를 저장하지 못했어요.'); }
+  }
+}
+function writtenCharDelta(before, after, inputEvent) {
+  const type = inputEvent?.inputType || '';
+  if (!['insertText', 'insertCompositionText', 'insertLineBreak', 'insertParagraph'].includes(type)) return 0;
+  return Math.max(0, after.length - before.length);
 }
 function recordDailyWriting(chars) {
   const stats = loadStats();
@@ -8296,7 +8337,7 @@ function getWeekTypingSec() {
   let total = 0;
   for (let i = 0; i < 7; i++) {
     const d = new Date(); d.setDate(d.getDate() - i);
-    total += s[d.toISOString().slice(0,10)] || 0;
+    total += s[getTodayStr(d)] || 0;
   }
   return total;
 }
@@ -8307,7 +8348,7 @@ function getMonthTypingSec() {
   let total = 0;
   for (let i = 0; i < 30; i++) {
     const d = new Date(); d.setDate(d.getDate() - i);
-    total += s[d.toISOString().slice(0,10)] || 0;
+    total += s[getTodayStr(d)] || 0;
   }
   return total;
 }
@@ -8334,6 +8375,14 @@ function onTypingKey() {
     _typingState.ticker = null;
   }, getTypingGap() * 1000);
 }
+function stopTypingTimer() {
+  clearTimeout(_typingState.idleTimer);
+  clearInterval(_typingState.ticker);
+  _typingState.active = false;
+  _typingState.ticker = null;
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopTypingTimer(); });
+window.addEventListener('blur', stopTypingTimer);
 function updateTypingDisplay() {
   const el = document.getElementById('pomo-typing-time');
   if (el) el.textContent = typingFmt(pomoState.sessionTypingSec);
@@ -8362,7 +8411,7 @@ function renderStats() {
   let streak = 0;
   const d = new Date();
   for (let i = 0; i < 365; i++) {
-    const key = d.toISOString().slice(0, 10);
+    const key = getTodayStr(d);
     if ((pStats[key] || 0) > 0) { streak++; d.setDate(d.getDate() - 1); }
     else break;
   }
@@ -8380,7 +8429,7 @@ function renderStats() {
       const idx = col * 7 + row;
       const dd = new Date();
       dd.setDate(dd.getDate() - idx);
-      const key = dd.toISOString().slice(0, 10);
+      const key = getTodayStr(dd);
       const val = pStats[key] || 0;
       const intensity = val === 0 ? 0 : Math.ceil((val / maxVal) * 4);
       const isToday = key === today;
@@ -8411,7 +8460,7 @@ function renderStats() {
   // 최근 30일 합산
   const last30 = Array.from({length:30},(_,i)=>{
     const dd = new Date(); dd.setDate(dd.getDate()-i);
-    return pStats[dd.toISOString().slice(0,10)]||0;
+    return pStats[getTodayStr(dd)]||0;
   }).reduce((a,b)=>a+b,0);
 
   const goalColor = goalPct >= 100 ? 'var(--teal)' : 'var(--gold)';
@@ -8422,6 +8471,7 @@ function renderStats() {
         <div>
           <div class="font-display" style="font-size:22px">집필 통계</div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px">${esc(p.title)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:5px">직접 입력해 늘어난 글자만 기록해요 · 붙여넣기는 제외돼요</div>
         </div>
       </div>
 

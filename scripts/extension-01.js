@@ -45,15 +45,6 @@ document.addEventListener('input', e => {
   if (_searchHandlers[id] && !e.isComposing) _searchHandlers[id]();
 });
 
-// 타이핑 감지 이벤트 연결
-document.addEventListener('keydown', e => {
-  const ta = document.getElementById('prose-editor');
-  const fe = document.getElementById('focus-editor');
-  if (document.activeElement === ta || document.activeElement === fe) {
-    if (!e.ctrlKey && !e.metaKey && !e.altKey) onTypingKey();
-  }
-});
-
 function pomoCollapse() {
   const body = document.getElementById('pomo-body');
   const btn = document.getElementById('pomo-collapse-btn');

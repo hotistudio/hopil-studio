@@ -1643,13 +1643,15 @@ function enterFocusMode() {
   }
 
   // 입력 이벤트
-  focusEditor.oninput = () => {
+  focusEditor.oninput = event => {
     updateFocusWordCount();
     // 원본에도 즉시 반영
     const p2 = getProject();
     const ch2 = (p2?.chapters||[]).find(c => c.id === focusChapterId);
     if (ch2) {
+      const diff = writtenCharDelta(ch2.content || '', focusEditor.value, event);
       ch2.content = focusEditor.value;
+      if (diff > 0) { recordDailyWriting(diff); onTypingKey(); }
       autoSave();
     }
   };

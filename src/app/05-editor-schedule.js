@@ -248,7 +248,7 @@ function renderEditorContent(ch) {
         </div>
         <div class="editor-content" style="flex:1;overflow-y:auto;">
           <textarea id="prose-editor" placeholder="이야기를 시작하세요..."
-            oninput="onEditorInput('${ch.id}',this.value)">${esc(ch.content||'')}</textarea>
+            oninput="onEditorInput('${ch.id}',this.value,event)">${esc(ch.content||'')}</textarea>
         </div>
       </div>
       <!-- 오른쪽: 참고 패널 -->
@@ -372,17 +372,18 @@ function updateChapterMemo(chId, val) {
   window._chMemoTimer = setTimeout(autoSave, 600);
 }
 
-function onEditorInput(id, val) {
+function onEditorInput(id, val, inputEvent) {
   const p = getProject();
   const ch = p.chapters.find(c => c.id === id);
   if (!ch) return;
-  const prevLen = (ch.content || '').length;
+  const previous = ch.content || '';
   ch.content = val;
   const wc = document.getElementById('wc-display');
   if (wc) wc.textContent = val.length.toLocaleString() + '자';
   // 날짜별 집필량 기록
-  const diff = val.length - prevLen;
+  const diff = writtenCharDelta(previous, val, inputEvent);
   if (diff > 0) recordDailyWriting(diff);
+  if (diff > 0) onTypingKey();
   // debounce save
   clearTimeout(window._saveTimer);
   window._saveTimer = setTimeout(() => { autoSave(); updateChapterListItem(ch); }, 800);

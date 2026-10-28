@@ -339,7 +339,7 @@ function changeFontSize(delta) {
 // Ctrl+S 시 호출 — fileHandles 시스템 사용
 async function fsSaveToLocal(projectData) {
   const isProject = !!projectData;
-  const data = isProject ? projectData : { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
+  const data = isProject ? projectBackup(projectData) : { projects: state.projects, ...statsBackup(), version: '2.1', savedAt: new Date().toISOString() };
   const suggestedName = isProject ? (projectData.title || '호필스튜디오') + '.json' : '호필스튜디오_전체.json';
 
   if (FS_SUPPORTED) {
@@ -465,14 +465,51 @@ function showGroupColorPicker(groupName, btnEl) {
 // ═══════════════════════════════════════════════════════════════
 const STATS_KEY = 'hopil_studio_writing_stats';
 
-function getTodayStr() {
-  return new Date().toISOString().slice(0, 10);
+function getTodayStr(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
 function loadStats() {
   try { return JSON.parse(localStorage.getItem(STATS_KEY) || '{}'); } catch(e) { return {}; }
 }
 function saveStats(s) {
   try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch(e) {}
+}
+function cleanImportedStats(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const cleaned = Object.create(null);
+  for (const [pid, days] of Object.entries(value)) {
+    if (!/^[\w.-]+$/.test(pid) || !days || typeof days !== 'object' || Array.isArray(days)) continue;
+    const validDays = Object.create(null);
+    for (const [day, amount] of Object.entries(days)) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(day) && Number.isFinite(amount) && amount >= 0) validDays[day] = amount;
+    }
+    cleaned[pid] = validDays;
+  }
+  return cleaned;
+}
+function statsBackup(projectId) {
+  const writing = cleanImportedStats(loadStats());
+  const typing = cleanImportedStats(loadTypingStats());
+  if (!projectId) return { writingStats: writing, typingStats: typing };
+  return { writingStats: { [projectId]: writing[projectId] || {} }, typingStats: { [projectId]: typing[projectId] || {} } };
+}
+function projectBackup(project) {
+  return { project, ...statsBackup(project.id), version: '2.1', savedAt: new Date().toISOString() };
+}
+function restoreStats(data, projectIds, replaceAll = false) {
+  const ids = new Set(projectIds);
+  for (const [key, incoming] of [[STATS_KEY, data.writingStats], [TYPING_STATS_KEY, data.typingStats]]) {
+    if (incoming === undefined) continue; // 예전 백업에는 통계가 없다.
+    const current = replaceAll ? {} : cleanImportedStats(key === STATS_KEY ? loadStats() : loadTypingStats());
+    const restored = cleanImportedStats(incoming);
+    for (const id of ids) if (Object.prototype.hasOwnProperty.call(restored, id)) current[id] = restored[id];
+    try { localStorage.setItem(key, JSON.stringify(current)); } catch(e) { toast('⚠️ 집필 통계를 저장하지 못했어요.'); }
+  }
+}
+function writtenCharDelta(before, after, inputEvent) {
+  const type = inputEvent?.inputType || '';
+  if (!['insertText', 'insertCompositionText', 'insertLineBreak', 'insertParagraph'].includes(type)) return 0;
+  return Math.max(0, after.length - before.length);
 }
 function recordDailyWriting(chars) {
   const stats = loadStats();
@@ -581,7 +618,7 @@ function getWeekTypingSec() {
   let total = 0;
   for (let i = 0; i < 7; i++) {
     const d = new Date(); d.setDate(d.getDate() - i);
-    total += s[d.toISOString().slice(0,10)] || 0;
+    total += s[getTodayStr(d)] || 0;
   }
   return total;
 }
@@ -592,7 +629,7 @@ function getMonthTypingSec() {
   let total = 0;
   for (let i = 0; i < 30; i++) {
     const d = new Date(); d.setDate(d.getDate() - i);
-    total += s[d.toISOString().slice(0,10)] || 0;
+    total += s[getTodayStr(d)] || 0;
   }
   return total;
 }
@@ -619,6 +656,14 @@ function onTypingKey() {
     _typingState.ticker = null;
   }, getTypingGap() * 1000);
 }
+function stopTypingTimer() {
+  clearTimeout(_typingState.idleTimer);
+  clearInterval(_typingState.ticker);
+  _typingState.active = false;
+  _typingState.ticker = null;
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopTypingTimer(); });
+window.addEventListener('blur', stopTypingTimer);
 function updateTypingDisplay() {
   const el = document.getElementById('pomo-typing-time');
   if (el) el.textContent = typingFmt(pomoState.sessionTypingSec);
@@ -647,7 +692,7 @@ function renderStats() {
   let streak = 0;
   const d = new Date();
   for (let i = 0; i < 365; i++) {
-    const key = d.toISOString().slice(0, 10);
+    const key = getTodayStr(d);
     if ((pStats[key] || 0) > 0) { streak++; d.setDate(d.getDate() - 1); }
     else break;
   }
@@ -665,7 +710,7 @@ function renderStats() {
       const idx = col * 7 + row;
       const dd = new Date();
       dd.setDate(dd.getDate() - idx);
-      const key = dd.toISOString().slice(0, 10);
+      const key = getTodayStr(dd);
       const val = pStats[key] || 0;
       const intensity = val === 0 ? 0 : Math.ceil((val / maxVal) * 4);
       const isToday = key === today;
@@ -696,7 +741,7 @@ function renderStats() {
   // 최근 30일 합산
   const last30 = Array.from({length:30},(_,i)=>{
     const dd = new Date(); dd.setDate(dd.getDate()-i);
-    return pStats[dd.toISOString().slice(0,10)]||0;
+    return pStats[getTodayStr(dd)]||0;
   }).reduce((a,b)=>a+b,0);
 
   const goalColor = goalPct >= 100 ? 'var(--teal)' : 'var(--gold)';
@@ -707,6 +752,7 @@ function renderStats() {
         <div>
           <div class="font-display" style="font-size:22px">집필 통계</div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px">${esc(p.title)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:5px">직접 입력해 늘어난 글자만 기록해요 · 붙여넣기는 제외돼요</div>
         </div>
       </div>
 

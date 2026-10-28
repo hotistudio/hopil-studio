@@ -287,7 +287,7 @@ function renderOverview() {
             : '—';
           const allStats = (() => { try { return JSON.parse(localStorage.getItem('hopil_studio_writing_stats')||'{}'); } catch(e) { return {}; } })();
           const pStats = allStats[p.id] || {};
-          const todayKey = new Date().toISOString().slice(0,10);
+          const todayKey = getTodayStr();
           const todayCount = pStats[todayKey] || 0;
           return [
             {label:'집필 요일', val:routineStr, unit:'', color:'var(--gold)', small: routineDays.length > 4},
