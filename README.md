@@ -2,9 +2,11 @@
 
 `index.html`이 앱의 시작 화면입니다. 화면 스타일은 `styles/`, 기능별 원본 코드는 `src/app/`에 있습니다. `scripts/app.js`는 원본 코드를 기존 실행 순서대로 합친 브라우저용 파일입니다.
 
-기능 코드를 수정한 뒤 `node build-app.cjs`를 실행해 `scripts/app.js`를 갱신하세요. `node tests/safety.cjs`, `node tests/typewriter.cjs`, `node tests/editor.cjs`, `node tests/stats.cjs`, `node tests/reference.cjs`로 저장·복구·가져오기와 집필 편집기·통계·참고 패널 검사를 실행할 수 있습니다.
+기능 코드를 수정한 뒤 `node build-app.cjs`를 실행해 `scripts/app.js`를 갱신하세요. `node tests/safety.cjs`, `node tests/typewriter.cjs`, `node tests/editor.cjs`, `node tests/stats.cjs`, `node tests/reference.cjs`, `node tests/reader-style.cjs`로 저장·복구·가져오기와 집필 편집기·통계·참고 패널·화면 양식 검사를 실행할 수 있습니다.
 
 집필 편집기와 집중 모드의 **⌖ 타자기 스크롤** 버튼을 누르면 입력 중인 줄을 화면의 중간 부근에 유지합니다. 설정은 이 브라우저에 기억됩니다.
+
+집필 편집기의 **⋯ 도구 → 화면 양식** 또는 집중 모드의 **화면 양식**에서 기본 집필기, 카카오페이지풍, 리디풍, 네이버 시리즈풍을 고를 수 있습니다. 글꼴·배경·행간·본문 폭만 바뀌며 원고 내용과 내보내기 파일은 바뀌지 않습니다. 선택은 이 브라우저에 기억됩니다. 플랫폼별 스타일은 독서 분위기를 참고한 예시이며 실제 앱 화면이나 제출 규격과 동일하지 않습니다.
 
 데스크탑과 태블릿에서는 집필기와 참고 패널 사이의 경계를 드래그해 너비를 조절할 수 있습니다. 태블릿에서 참고 패널을 열면 회차 목록이 접혀 본문 공간을 확보합니다. 경계에 키보드 초점을 두고 좌우 화살표로도 조절할 수 있습니다.
 

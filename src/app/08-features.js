@@ -318,6 +318,37 @@ function renderStorageIndicator() {
 // ═══════════════════════════════════════════════════════════
 let editorFontSize = parseInt(localStorage.getItem('hopil_studio_fontsize') || '16');
 
+const READER_STYLE_KEY = 'hopil_studio_reader_style';
+const READER_STYLES = [
+  { id: 'default', label: '기본 집필기' },
+  { id: 'kakao', label: '카카오페이지풍' },
+  { id: 'ridi', label: '리디풍' },
+  { id: 'naver', label: '네이버 시리즈풍' },
+];
+let readerStyle = 'default';
+try {
+  const saved = localStorage.getItem(READER_STYLE_KEY);
+  if (READER_STYLES.some(style => style.id === saved)) readerStyle = saved;
+} catch (_) {}
+
+function readerStyleOptions() {
+  return READER_STYLES.map(style =>
+    `<option value="${style.id}" ${style.id === readerStyle ? 'selected' : ''}>${style.label}</option>`
+  ).join('');
+}
+
+function applyReaderStyle() {
+  document.documentElement.setAttribute('data-reader-style', readerStyle);
+  document.querySelectorAll('.reader-style-select').forEach(select => { select.value = readerStyle; });
+}
+
+function changeReaderStyle(value) {
+  if (!READER_STYLES.some(style => style.id === value)) return;
+  readerStyle = value;
+  try { localStorage.setItem(READER_STYLE_KEY, value); } catch (_) {}
+  applyReaderStyle();
+}
+
 function applyEditorFontSize() {
   document.documentElement.style.setProperty('--editor-font-size', editorFontSize + 'px');
   const display = document.getElementById('font-size-display');

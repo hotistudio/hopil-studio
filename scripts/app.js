@@ -1663,7 +1663,7 @@ function renderHome() {
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
         <p style="font-size:11px;color:var(--muted);opacity:.6;line-height:1.8">
-          호필 스튜디오 v0.6.12 beta · © 2026 호백<br>
+          호필 스튜디오 v0.6.13 beta · © 2026 호백<br>
           <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
             style="color:var(--muted);text-decoration:none;opacity:.8">CC BY-NC 4.0</a>
           · 비상업적 목적에 한해 자유롭게 사용 가능<br>
@@ -3301,7 +3301,7 @@ function renderChapters() {
     </div>`;
   applyChapterListCollapsed();
   setTimeout(() => {
-    refreshShortcutBar(); applyEditorFontSize(); initChDrag(); initAllDragScrolls(); initSplitPanelResize();
+    refreshShortcutBar(); applyEditorFontSize(); applyReaderStyle(); initChDrag(); initAllDragScrolls(); initSplitPanelResize();
     if (typeof updateTypewriterButtons === 'function') updateTypewriterButtons();
     const listBody = document.getElementById('chapter-list-body');
     if (listBody) listBody.scrollTop = prevScroll;
@@ -3339,6 +3339,9 @@ function renderEditorContent(ch) {
           <details class="editor-more">
             <summary class="btn btn-outline btn-sm" aria-label="추가 집필 도구">⋯ 도구</summary>
             <div class="editor-more-actions">
+              <label class="reader-style-control">📖 화면 양식
+                <select class="reader-style-select" aria-label="집필 화면 양식" title="집필 화면의 보기만 바뀝니다" onchange="changeReaderStyle(this.value)">${readerStyleOptions()}</select>
+              </label>
               <button class="btn btn-outline btn-sm" onclick="this.closest('details').open=false;toggleFindReplace()" id="find-replace-btn" title="찾기/바꾸기 (Ctrl+H)">🔍 찾기</button>
               <div class="editor-font-controls">
                 <button onclick="changeFontSize(-1)" aria-label="글자 크기 줄이기">−</button>
@@ -6913,6 +6916,7 @@ function enterFocusMode() {
   // 오버레이 열기
   const overlay = document.getElementById('focus-overlay');
   overlay.classList.add('active');
+  applyReaderStyle();
   focusEditor.focus();
 
   // 전체화면 요청
@@ -8089,6 +8093,37 @@ function renderStorageIndicator() {
 // 집필기 폰트 크기 조절
 // ═══════════════════════════════════════════════════════════
 let editorFontSize = parseInt(localStorage.getItem('hopil_studio_fontsize') || '16');
+
+const READER_STYLE_KEY = 'hopil_studio_reader_style';
+const READER_STYLES = [
+  { id: 'default', label: '기본 집필기' },
+  { id: 'kakao', label: '카카오페이지풍' },
+  { id: 'ridi', label: '리디풍' },
+  { id: 'naver', label: '네이버 시리즈풍' },
+];
+let readerStyle = 'default';
+try {
+  const saved = localStorage.getItem(READER_STYLE_KEY);
+  if (READER_STYLES.some(style => style.id === saved)) readerStyle = saved;
+} catch (_) {}
+
+function readerStyleOptions() {
+  return READER_STYLES.map(style =>
+    `<option value="${style.id}" ${style.id === readerStyle ? 'selected' : ''}>${style.label}</option>`
+  ).join('');
+}
+
+function applyReaderStyle() {
+  document.documentElement.setAttribute('data-reader-style', readerStyle);
+  document.querySelectorAll('.reader-style-select').forEach(select => { select.value = readerStyle; });
+}
+
+function changeReaderStyle(value) {
+  if (!READER_STYLES.some(style => style.id === value)) return;
+  readerStyle = value;
+  try { localStorage.setItem(READER_STYLE_KEY, value); } catch (_) {}
+  applyReaderStyle();
+}
 
 function applyEditorFontSize() {
   document.documentElement.style.setProperty('--editor-font-size', editorFontSize + 'px');
@@ -11679,6 +11714,7 @@ migrateAllProjects();
 initDarkMode();
 initColorTheme();
 applyEditorFontSize();
+applyReaderStyle();
 renderHome();
 history.replaceState({screen:'home'}, null);
 setTimeout(() => { tryAutoReconnect(); }, 300);

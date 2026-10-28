@@ -5,6 +5,7 @@ migrateAllProjects();
 initDarkMode();
 initColorTheme();
 applyEditorFontSize();
+applyReaderStyle();
 renderHome();
 history.replaceState({screen:'home'}, null);
 setTimeout(() => { tryAutoReconnect(); }, 300);

@@ -168,7 +168,7 @@ function renderChapters() {
     </div>`;
   applyChapterListCollapsed();
   setTimeout(() => {
-    refreshShortcutBar(); applyEditorFontSize(); initChDrag(); initAllDragScrolls(); initSplitPanelResize();
+    refreshShortcutBar(); applyEditorFontSize(); applyReaderStyle(); initChDrag(); initAllDragScrolls(); initSplitPanelResize();
     if (typeof updateTypewriterButtons === 'function') updateTypewriterButtons();
     const listBody = document.getElementById('chapter-list-body');
     if (listBody) listBody.scrollTop = prevScroll;
@@ -206,6 +206,9 @@ function renderEditorContent(ch) {
           <details class="editor-more">
             <summary class="btn btn-outline btn-sm" aria-label="추가 집필 도구">⋯ 도구</summary>
             <div class="editor-more-actions">
+              <label class="reader-style-control">📖 화면 양식
+                <select class="reader-style-select" aria-label="집필 화면 양식" title="집필 화면의 보기만 바뀝니다" onchange="changeReaderStyle(this.value)">${readerStyleOptions()}</select>
+              </label>
               <button class="btn btn-outline btn-sm" onclick="this.closest('details').open=false;toggleFindReplace()" id="find-replace-btn" title="찾기/바꾸기 (Ctrl+H)">🔍 찾기</button>
               <div class="editor-font-controls">
                 <button onclick="changeFontSize(-1)" aria-label="글자 크기 줄이기">−</button>

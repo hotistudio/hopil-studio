@@ -1688,6 +1688,7 @@ function enterFocusMode() {
   // 오버레이 열기
   const overlay = document.getElementById('focus-overlay');
   overlay.classList.add('active');
+  applyReaderStyle();
   focusEditor.focus();
 
   // 전체화면 요청
