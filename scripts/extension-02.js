@@ -2,7 +2,7 @@
   'use strict';
 
   // ─── IndexedDB 래퍼 (FileHandle · 스냅샷 저장용) ─────────────────
-  const DB_NAME = 'wnstudio_safety';
+  const DB_NAME = 'hopil_studio_safety';
   const DB_VER  = 1;
   const STORE_HANDLES   = 'handles';
   const STORE_SNAPSHOTS = 'snapshots';

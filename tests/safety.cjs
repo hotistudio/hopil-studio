@@ -41,9 +41,9 @@ async function main() {
   assert.equal(await write(failing, { content: 'test' }), false);
   assert.equal(context.fileHandles.projects.project, undefined);
 
-  const store = new Map([['wnstudio_v1', '{broken json']]);
+  const store = new Map([['hopil_studio_projects_v1', '{broken json']]);
   const recovery = vm.createContext({
-    STORAGE_KEY: 'wnstudio_v1', state: { projects: [] },
+    STORAGE_KEY: 'hopil_studio_projects_v1', state: { projects: [] },
     localStorage: {
       getItem: key => store.get(key) || null,
       setItem: (key, value) => store.set(key, value),
@@ -54,10 +54,30 @@ async function main() {
   });
   vm.runInContext(section('function saveToStorage', '// SCHEMA MIGRATION'), recovery);
   vm.runInContext('loadFromStorage()', recovery);
-  assert.equal(store.get('wnstudio_v1'), '{broken json');
+  assert.equal(store.get('hopil_studio_projects_v1'), '{broken json');
   assert.equal(recovery.storageLoadFailed, true);
   assert.equal(vm.runInContext('saveToStorage()', recovery), false);
-  assert.equal(store.get('wnstudio_v1'), '{broken json');
+  assert.equal(store.get('hopil_studio_projects_v1'), '{broken json');
+
+  const previous = JSON.stringify([{ id: 'legacy', title: '이전 원고' }]);
+  const oldStore = new Map([['wnstudio_v1', previous]]);
+  const separate = vm.createContext({
+    STORAGE_KEY: 'hopil_studio_projects_v1', state: { projects: [] },
+    localStorage: {
+      getItem: key => oldStore.has(key) ? oldStore.get(key) : null,
+      setItem: (key, value) => oldStore.set(key, value),
+      removeItem: key => oldStore.delete(key)
+    },
+    console: { error() {} }, toast() {}, storageLoadFailed: false,
+    fileHandles: { all: null, projects: {} }
+  });
+  vm.runInContext(section('function saveToStorage', '// SCHEMA MIGRATION'), separate);
+  vm.runInContext('loadFromStorage()', separate);
+  assert.equal(oldStore.get('wnstudio_v1'), previous);
+  assert.equal(oldStore.get('hopil_studio_projects_v1'), previous);
+  vm.runInContext("state.projects[0].title = '새 원고'; saveToStorage()", separate);
+  assert.equal(JSON.parse(oldStore.get('wnstudio_v1'))[0].title, '이전 원고');
+  assert.equal(JSON.parse(oldStore.get('hopil_studio_projects_v1'))[0].title, '새 원고');
 
   const imports = vm.createContext({});
   vm.runInContext(section('const MAX_IMPORT_BYTES', 'function importSingleProject'), imports);

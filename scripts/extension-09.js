@@ -1,8 +1,8 @@
 (function PomodoroTier1() {
   'use strict';
 
-  const STORAGE_STATE = 'wnstudio_pomo_state';
-  const STORAGE_DAILY = 'wnstudio_pomo_daily';
+  const STORAGE_STATE = 'hopil_studio_pomo_state';
+  const STORAGE_DAILY = 'hopil_studio_pomo_daily';
 
   // ─── 유틸 ───────────────────────────────────────────────────────
   function todayStr() {

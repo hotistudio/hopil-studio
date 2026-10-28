@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════════
-const STORAGE_KEY = 'wnstudio_v1';
+const STORAGE_KEY = 'hopil_studio_projects_v1';
 let storageLoadFailed = false;
 let state = {
   projects: [],
@@ -74,21 +74,18 @@ function saveToStorage() {
 
 function loadFromStorage() {
   try {
-    // 이전 버전 키에서 마이그레이션
-    const OLD_KEYS = ['wnstudio_v3', 'wnstudio_v2'];
-    for (const oldKey of OLD_KEYS) {
-      const old = localStorage.getItem(oldKey);
-      if (old && !localStorage.getItem(STORAGE_KEY)) {
-        try {
-          const parsed = JSON.parse(old);
-          if (Array.isArray(parsed)) {
-            localStorage.setItem(STORAGE_KEY, old);
-            localStorage.removeItem(oldKey);
-          }
-        } catch(e) {}
+    let d = localStorage.getItem(STORAGE_KEY);
+    // 첫 실행에만 예전 원고를 복사한다. 이전 앱의 원고는 삭제하거나 수정하지 않는다.
+    if (d === null) {
+      for (const oldKey of ['wnstudio_v1', 'wnstudio_v3', 'wnstudio_v2']) {
+        const old = localStorage.getItem(oldKey);
+        if (old === null) continue;
+        if (!Array.isArray(JSON.parse(old))) throw new Error('이전 원고 형식이 올바르지 않습니다.');
+        localStorage.setItem(STORAGE_KEY, old);
+        d = old;
+        break;
       }
     }
-    const d = localStorage.getItem(STORAGE_KEY);
     if (d) {
       const parsed = JSON.parse(d);
       if (!Array.isArray(parsed)) throw new Error('저장된 작품 목록 형식이 올바르지 않습니다.');
@@ -1871,7 +1868,7 @@ function renderOverview() {
           const routineStr = routineDays.length
             ? dayOrder.filter(d => routineDays.includes(d)).join('·')
             : '—';
-          const allStats = (() => { try { return JSON.parse(localStorage.getItem('wnstudio_writing_stats')||'{}'); } catch(e) { return {}; } })();
+          const allStats = (() => { try { return JSON.parse(localStorage.getItem('hopil_studio_writing_stats')||'{}'); } catch(e) { return {}; } })();
           const pStats = allStats[p.id] || {};
           const todayKey = new Date().toISOString().slice(0,10);
           const todayCount = pStats[todayKey] || 0;
@@ -7787,12 +7784,12 @@ const DEFAULT_SHORTCUTS = {
 };
 function loadShortcuts() {
   try {
-    const s = localStorage.getItem('wnstudio_shortcuts');
+    const s = localStorage.getItem('hopil_studio_shortcuts');
     return s ? JSON.parse(s) : {...DEFAULT_SHORTCUTS};
   } catch { return {...DEFAULT_SHORTCUTS}; }
 }
 function saveShortcuts(map) {
-  localStorage.setItem('wnstudio_shortcuts', JSON.stringify(map));
+  localStorage.setItem('hopil_studio_shortcuts', JSON.stringify(map));
 }
 let SHORTCUT_SYMBOLS = loadShortcuts();
 
@@ -7837,7 +7834,7 @@ const COLOR_THEMES = [
 
 function applyColorTheme(id) {
   document.documentElement.setAttribute('data-color-theme', id);
-  localStorage.setItem('wnstudio_color_theme', id);
+  localStorage.setItem('hopil_studio_color_theme', id);
   // 피커 닫기
   document.getElementById('theme-picker-popup')?.remove();
 }
@@ -7847,7 +7844,7 @@ function toggleThemePicker() {
   if (existing) { existing.remove(); return; }
   const btn = document.getElementById('btn-theme');
   const rect = btn.getBoundingClientRect();
-  const cur = localStorage.getItem('wnstudio_color_theme') || 'yellow';
+  const cur = localStorage.getItem('hopil_studio_color_theme') || 'yellow';
   const popup = document.createElement('div');
   popup.id = 'theme-picker-popup';
   popup.style.cssText = `position:fixed;top:${rect.bottom+6}px;right:${window.innerWidth-rect.right}px;
@@ -7883,14 +7880,14 @@ function toggleThemePicker() {
 }
 
 function initColorTheme() {
-  const saved = localStorage.getItem('wnstudio_color_theme') || 'yellow';
+  const saved = localStorage.getItem('hopil_studio_color_theme') || 'yellow';
   document.documentElement.setAttribute('data-color-theme', saved);
 }
 
 // 다크모드
 // ═══════════════════════════════════════════════════════════
 function initDarkMode() {
-  const saved = localStorage.getItem('wnstudio_darkmode');
+  const saved = localStorage.getItem('hopil_studio_darkmode');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const isDark = saved !== null ? saved === 'true' : prefersDark;
   applyDarkMode(isDark);
@@ -7900,7 +7897,7 @@ function applyDarkMode(isDark) {
   document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
   const btn = document.getElementById('btn-darkmode');
   if (btn) btn.textContent = isDark ? '☀️' : '🌙';
-  localStorage.setItem('wnstudio_darkmode', isDark);
+  localStorage.setItem('hopil_studio_darkmode', isDark);
 }
 
 function toggleDarkMode() {
@@ -7954,7 +7951,7 @@ function renderStorageIndicator() {
 // ═══════════════════════════════════════════════════════════
 // 집필기 폰트 크기 조절
 // ═══════════════════════════════════════════════════════════
-let editorFontSize = parseInt(localStorage.getItem('wnstudio_fontsize') || '16');
+let editorFontSize = parseInt(localStorage.getItem('hopil_studio_fontsize') || '16');
 
 function applyEditorFontSize() {
   document.documentElement.style.setProperty('--editor-font-size', editorFontSize + 'px');
@@ -7964,7 +7961,7 @@ function applyEditorFontSize() {
 
 function changeFontSize(delta) {
   editorFontSize = Math.min(28, Math.max(12, editorFontSize + delta));
-  localStorage.setItem('wnstudio_fontsize', editorFontSize);
+  localStorage.setItem('hopil_studio_fontsize', editorFontSize);
   applyEditorFontSize();
 }
 
@@ -8101,7 +8098,7 @@ function showGroupColorPicker(groupName, btnEl) {
 // ═══════════════════════════════════════════════════════════════
 // 집필 통계
 // ═══════════════════════════════════════════════════════════════
-const STATS_KEY = 'wnstudio_writing_stats';
+const STATS_KEY = 'hopil_studio_writing_stats';
 
 function getTodayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -8174,23 +8171,23 @@ function launchConfetti() {
   draw();
 }
 function getWritingGoal() {
-  try { return parseInt(localStorage.getItem('wnstudio_goal') || '1000'); } catch(e) { return 1000; }
+  try { return parseInt(localStorage.getItem('hopil_studio_goal') || '1000'); } catch(e) { return 1000; }
 }
 function setWritingGoal(n) {
-  localStorage.setItem('wnstudio_goal', String(n));
+  localStorage.setItem('hopil_studio_goal', String(n));
 }
 
 // ═══════════════════════════════════════════════════════════
 // 타이핑 시간 감지
 // ═══════════════════════════════════════════════════════════
-const TYPING_IDLE_KEY = 'wnstudio_typing_gap';
+const TYPING_IDLE_KEY = 'hopil_studio_typing_gap';
 function getTypingGap() {
   return parseInt(localStorage.getItem(TYPING_IDLE_KEY) || '5');
 }
 function setTypingGap(n) {
   localStorage.setItem(TYPING_IDLE_KEY, String(Math.max(1, Math.min(30, n))));
 }
-const TYPING_STATS_KEY = 'wnstudio_typing_stats';
+const TYPING_STATS_KEY = 'hopil_studio_typing_stats';
 function loadTypingStats() {
   try { return JSON.parse(localStorage.getItem(TYPING_STATS_KEY) || '{}'); } catch { return {}; }
 }
@@ -11538,7 +11535,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 // ═══════════════════════════════════════════════════════════════
 // 종료 전 백업 알림
 // ═══════════════════════════════════════════════════════════════
-const BACKUP_KEY = 'wnstudio_last_backup';
+const BACKUP_KEY = 'hopil_studio_last_backup';
 
 function getLastBackupTime() {
   return localStorage.getItem(BACKUP_KEY) ? new Date(localStorage.getItem(BACKUP_KEY)) : null;

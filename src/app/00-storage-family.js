@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════════
-const STORAGE_KEY = 'wnstudio_v1';
+const STORAGE_KEY = 'hopil_studio_projects_v1';
 let storageLoadFailed = false;
 let state = {
   projects: [],
@@ -74,21 +74,18 @@ function saveToStorage() {
 
 function loadFromStorage() {
   try {
-    // 이전 버전 키에서 마이그레이션
-    const OLD_KEYS = ['wnstudio_v3', 'wnstudio_v2'];
-    for (const oldKey of OLD_KEYS) {
-      const old = localStorage.getItem(oldKey);
-      if (old && !localStorage.getItem(STORAGE_KEY)) {
-        try {
-          const parsed = JSON.parse(old);
-          if (Array.isArray(parsed)) {
-            localStorage.setItem(STORAGE_KEY, old);
-            localStorage.removeItem(oldKey);
-          }
-        } catch(e) {}
+    let d = localStorage.getItem(STORAGE_KEY);
+    // 첫 실행에만 예전 원고를 복사한다. 이전 앱의 원고는 삭제하거나 수정하지 않는다.
+    if (d === null) {
+      for (const oldKey of ['wnstudio_v1', 'wnstudio_v3', 'wnstudio_v2']) {
+        const old = localStorage.getItem(oldKey);
+        if (old === null) continue;
+        if (!Array.isArray(JSON.parse(old))) throw new Error('이전 원고 형식이 올바르지 않습니다.');
+        localStorage.setItem(STORAGE_KEY, old);
+        d = old;
+        break;
       }
     }
-    const d = localStorage.getItem(STORAGE_KEY);
     if (d) {
       const parsed = JSON.parse(d);
       if (!Array.isArray(parsed)) throw new Error('저장된 작품 목록 형식이 올바르지 않습니다.');

@@ -3,6 +3,7 @@
   "short_name": "호필",
   "description": "웹소설 집필과 작품 관리",
   "lang": "ko",
+  "id": "/hopil-studio/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

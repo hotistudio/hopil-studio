@@ -285,7 +285,7 @@ function renderOverview() {
           const routineStr = routineDays.length
             ? dayOrder.filter(d => routineDays.includes(d)).join('·')
             : '—';
-          const allStats = (() => { try { return JSON.parse(localStorage.getItem('wnstudio_writing_stats')||'{}'); } catch(e) { return {}; } })();
+          const allStats = (() => { try { return JSON.parse(localStorage.getItem('hopil_studio_writing_stats')||'{}'); } catch(e) { return {}; } })();
           const pStats = allStats[p.id] || {};
           const todayKey = new Date().toISOString().slice(0,10);
           const todayCount = pStats[todayKey] || 0;

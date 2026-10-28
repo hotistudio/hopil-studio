@@ -1,7 +1,7 @@
 (function PomodoroTier2() {
   'use strict';
 
-  const STORAGE_CONFIG = 'wnstudio_pomo_config';
+  const STORAGE_CONFIG = 'hopil_studio_pomo_config';
 
   // ─── 기본 설정 + 프리셋 ─────────────────────────────────────────
   const DEFAULT_CFG = {

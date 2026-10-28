@@ -48,7 +48,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 // ═══════════════════════════════════════════════════════════════
 // 종료 전 백업 알림
 // ═══════════════════════════════════════════════════════════════
-const BACKUP_KEY = 'wnstudio_last_backup';
+const BACKUP_KEY = 'hopil_studio_last_backup';
 
 function getLastBackupTime() {
   return localStorage.getItem(BACKUP_KEY) ? new Date(localStorage.getItem(BACKUP_KEY)) : null;

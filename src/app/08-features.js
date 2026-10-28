@@ -149,12 +149,12 @@ const DEFAULT_SHORTCUTS = {
 };
 function loadShortcuts() {
   try {
-    const s = localStorage.getItem('wnstudio_shortcuts');
+    const s = localStorage.getItem('hopil_studio_shortcuts');
     return s ? JSON.parse(s) : {...DEFAULT_SHORTCUTS};
   } catch { return {...DEFAULT_SHORTCUTS}; }
 }
 function saveShortcuts(map) {
-  localStorage.setItem('wnstudio_shortcuts', JSON.stringify(map));
+  localStorage.setItem('hopil_studio_shortcuts', JSON.stringify(map));
 }
 let SHORTCUT_SYMBOLS = loadShortcuts();
 
@@ -199,7 +199,7 @@ const COLOR_THEMES = [
 
 function applyColorTheme(id) {
   document.documentElement.setAttribute('data-color-theme', id);
-  localStorage.setItem('wnstudio_color_theme', id);
+  localStorage.setItem('hopil_studio_color_theme', id);
   // 피커 닫기
   document.getElementById('theme-picker-popup')?.remove();
 }
@@ -209,7 +209,7 @@ function toggleThemePicker() {
   if (existing) { existing.remove(); return; }
   const btn = document.getElementById('btn-theme');
   const rect = btn.getBoundingClientRect();
-  const cur = localStorage.getItem('wnstudio_color_theme') || 'yellow';
+  const cur = localStorage.getItem('hopil_studio_color_theme') || 'yellow';
   const popup = document.createElement('div');
   popup.id = 'theme-picker-popup';
   popup.style.cssText = `position:fixed;top:${rect.bottom+6}px;right:${window.innerWidth-rect.right}px;
@@ -245,14 +245,14 @@ function toggleThemePicker() {
 }
 
 function initColorTheme() {
-  const saved = localStorage.getItem('wnstudio_color_theme') || 'yellow';
+  const saved = localStorage.getItem('hopil_studio_color_theme') || 'yellow';
   document.documentElement.setAttribute('data-color-theme', saved);
 }
 
 // 다크모드
 // ═══════════════════════════════════════════════════════════
 function initDarkMode() {
-  const saved = localStorage.getItem('wnstudio_darkmode');
+  const saved = localStorage.getItem('hopil_studio_darkmode');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const isDark = saved !== null ? saved === 'true' : prefersDark;
   applyDarkMode(isDark);
@@ -262,7 +262,7 @@ function applyDarkMode(isDark) {
   document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
   const btn = document.getElementById('btn-darkmode');
   if (btn) btn.textContent = isDark ? '☀️' : '🌙';
-  localStorage.setItem('wnstudio_darkmode', isDark);
+  localStorage.setItem('hopil_studio_darkmode', isDark);
 }
 
 function toggleDarkMode() {
@@ -316,7 +316,7 @@ function renderStorageIndicator() {
 // ═══════════════════════════════════════════════════════════
 // 집필기 폰트 크기 조절
 // ═══════════════════════════════════════════════════════════
-let editorFontSize = parseInt(localStorage.getItem('wnstudio_fontsize') || '16');
+let editorFontSize = parseInt(localStorage.getItem('hopil_studio_fontsize') || '16');
 
 function applyEditorFontSize() {
   document.documentElement.style.setProperty('--editor-font-size', editorFontSize + 'px');
@@ -326,7 +326,7 @@ function applyEditorFontSize() {
 
 function changeFontSize(delta) {
   editorFontSize = Math.min(28, Math.max(12, editorFontSize + delta));
-  localStorage.setItem('wnstudio_fontsize', editorFontSize);
+  localStorage.setItem('hopil_studio_fontsize', editorFontSize);
   applyEditorFontSize();
 }
 
@@ -463,7 +463,7 @@ function showGroupColorPicker(groupName, btnEl) {
 // ═══════════════════════════════════════════════════════════════
 // 집필 통계
 // ═══════════════════════════════════════════════════════════════
-const STATS_KEY = 'wnstudio_writing_stats';
+const STATS_KEY = 'hopil_studio_writing_stats';
 
 function getTodayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -536,23 +536,23 @@ function launchConfetti() {
   draw();
 }
 function getWritingGoal() {
-  try { return parseInt(localStorage.getItem('wnstudio_goal') || '1000'); } catch(e) { return 1000; }
+  try { return parseInt(localStorage.getItem('hopil_studio_goal') || '1000'); } catch(e) { return 1000; }
 }
 function setWritingGoal(n) {
-  localStorage.setItem('wnstudio_goal', String(n));
+  localStorage.setItem('hopil_studio_goal', String(n));
 }
 
 // ═══════════════════════════════════════════════════════════
 // 타이핑 시간 감지
 // ═══════════════════════════════════════════════════════════
-const TYPING_IDLE_KEY = 'wnstudio_typing_gap';
+const TYPING_IDLE_KEY = 'hopil_studio_typing_gap';
 function getTypingGap() {
   return parseInt(localStorage.getItem(TYPING_IDLE_KEY) || '5');
 }
 function setTypingGap(n) {
   localStorage.setItem(TYPING_IDLE_KEY, String(Math.max(1, Math.min(30, n))));
 }
-const TYPING_STATS_KEY = 'wnstudio_typing_stats';
+const TYPING_STATS_KEY = 'hopil_studio_typing_stats';
 function loadTypingStats() {
   try { return JSON.parse(localStorage.getItem(TYPING_STATS_KEY) || '{}'); } catch { return {}; }
 }

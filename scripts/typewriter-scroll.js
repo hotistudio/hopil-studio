@@ -1,5 +1,5 @@
 // 입력 중인 줄을 화면의 약 45% 높이에 유지한다.
-const TYPEWRITER_SCROLL_KEY = 'wnstudio_typewriter_scroll';
+const TYPEWRITER_SCROLL_KEY = 'hopil_studio_typewriter_scroll';
 let typewriterScrolling = false;
 try { typewriterScrolling = localStorage.getItem(TYPEWRITER_SCROLL_KEY) === 'true'; } catch (_) {}
 

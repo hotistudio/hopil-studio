@@ -45,7 +45,7 @@ const context = vm.createContext({
 vm.runInContext(source, context);
 assert(buttons.every(button => button.attributes['aria-pressed'] === 'false'));
 vm.runInContext('toggleTypewriterScrolling()', context);
-assert.equal(saved.get('wnstudio_typewriter_scroll'), 'true');
+assert.equal(saved.get('hopil_studio_typewriter_scroll'), 'true');
 assert(buttons.every(button => button.attributes['aria-pressed'] === 'true'));
 assert.equal(editor.scrollTop, 130);
 vm.runInContext('toggleTypewriterScrolling()', context);
