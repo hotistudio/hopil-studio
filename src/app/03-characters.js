@@ -503,7 +503,7 @@ function saveChar(idx) {
   const splitPanel = document.getElementById('split-panel');
   const inSplitPanel = splitPanel && !splitPanel.classList.contains('hidden');
   const inFocus = document.getElementById('focus-overlay')?.classList.contains('active');
-  if ((inSplitPanel || inFocus) && splitTab === 'characters') {
+  if ((inSplitPanel || inFocus) && (splitTab === 'characters' || splitTab === 'relations' || _focusRefTab === 'relations')) {
     refreshSplitPanel();
   } else if (!inFocus) {
     // 가계도 등 다른 탭에서 편집했다면 해당 탭을 유지한 채 갱신

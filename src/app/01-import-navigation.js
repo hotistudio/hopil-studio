@@ -274,6 +274,7 @@ function goHome() {
 }
 
 function openProject(id) {
+  if (state.activeProjectId !== id) splitOverviewEditing = false;
   state.activeProjectId = id;
   state.activeTab = 'overview';
   const p = getProject();

@@ -1414,6 +1414,7 @@ function goHome() {
 }
 
 function openProject(id) {
+  if (state.activeProjectId !== id) splitOverviewEditing = false;
   state.activeProjectId = id;
   state.activeTab = 'overview';
   const p = getProject();
@@ -2546,7 +2547,7 @@ function saveChar(idx) {
   const splitPanel = document.getElementById('split-panel');
   const inSplitPanel = splitPanel && !splitPanel.classList.contains('hidden');
   const inFocus = document.getElementById('focus-overlay')?.classList.contains('active');
-  if ((inSplitPanel || inFocus) && splitTab === 'characters') {
+  if ((inSplitPanel || inFocus) && (splitTab === 'characters' || splitTab === 'relations' || _focusRefTab === 'relations')) {
     refreshSplitPanel();
   } else if (!inFocus) {
     // 가계도 등 다른 탭에서 편집했다면 해당 탭을 유지한 채 갱신
@@ -6012,6 +6013,16 @@ function confirmDialog(msg, onOk) {
 // 분할 패널 (참고 패널)
 // ═══════════════════════════════════════════════════════════
 let splitTab = 'overview';
+let splitOverviewEditing = false;
+
+function splitElement(id) {
+  const focusPanel = document.getElementById('focus-ref-panel');
+  if (document.getElementById('focus-overlay')?.classList.contains('active') &&
+      focusPanel?.style.display !== 'none') {
+    return focusPanel.querySelector(`[id="${id}"]`);
+  }
+  return document.getElementById('split-panel')?.querySelector(`[id="${id}"]`) || null;
+}
 
 function toggleSplitPanel() {
   const panel = document.getElementById('split-panel');
@@ -6036,23 +6047,36 @@ function toggleSplitPanel() {
 
       // 스와이프로 닫기
       let _swipeStartX = null;
+      let _swipeStartY = null;
+      let _swipeDirection = null;
       panel._swipeStart = (e) => {
+        if (e.target.closest('.split-panel-tabs, input, textarea, select')) return;
         _swipeStartX = e.touches[0].clientX;
+        _swipeStartY = e.touches[0].clientY;
+        _swipeDirection = null;
       };
       panel._swipeMove = (e) => {
         if (_swipeStartX === null) return;
         const dx = e.touches[0].clientX - _swipeStartX;
-        if (dx > 0) panel.style.transform = `translateX(${dx}px)`;
+        const dy = e.touches[0].clientY - _swipeStartY;
+        if (!_swipeDirection && Math.max(Math.abs(dx), Math.abs(dy)) > 12) {
+          _swipeDirection = Math.abs(dx) > Math.abs(dy) * 1.3 ? 'horizontal' : 'vertical';
+        }
+        if (_swipeDirection === 'horizontal' && dx > 0) panel.style.transform = `translateX(${dx}px)`;
       };
       panel._swipeEnd = (e) => {
-        const dx = e.changedTouches[0].clientX - _swipeStartX;
+        const dx = _swipeStartX === null ? 0 : (e.changedTouches[0]?.clientX ?? _swipeStartX) - _swipeStartX;
+        const close = _swipeDirection === 'horizontal' && dx > 80;
         panel.style.transform = '';
         _swipeStartX = null;
-        if (dx > 80) toggleSplitPanel();
+        _swipeStartY = null;
+        _swipeDirection = null;
+        if (close) toggleSplitPanel();
       };
       panel.addEventListener('touchstart', panel._swipeStart, {passive:true});
       panel.addEventListener('touchmove',  panel._swipeMove,  {passive:true});
       panel.addEventListener('touchend',   panel._swipeEnd,   {passive:true});
+      panel.addEventListener('touchcancel', panel._swipeEnd, {passive:true});
     }
     renderSplitContent();
     setTimeout(initAllDragScrolls, 50);
@@ -6064,6 +6088,7 @@ function toggleSplitPanel() {
     if (panel._swipeStart) panel.removeEventListener('touchstart', panel._swipeStart);
     if (panel._swipeMove) panel.removeEventListener('touchmove',  panel._swipeMove);
     if (panel._swipeEnd)  panel.removeEventListener('touchend',   panel._swipeEnd);
+    if (panel._swipeEnd)  panel.removeEventListener('touchcancel', panel._swipeEnd);
     panel.style.transform = '';
   }
 }
@@ -6084,6 +6109,24 @@ function renderSplitContent() {
   if (!p) { el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">작품을 먼저 열어주세요</div>'; return; }
 
   if (splitTab === 'overview') {
+    if (splitOverviewEditing) {
+      el.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <strong style="font-size:13px">작품 개요 편집</strong>
+          <button class="btn btn-outline btn-sm" onclick="splitOverviewEditing=false;refreshSplitPanel()">완료</button>
+        </div>
+        <label class="label">작품 제목</label>
+        <input value="${esc(p.title||'')}" oninput="updateProject('title',this.value)" style="width:100%;margin-bottom:10px">
+        <label class="label">장르</label>
+        <select onchange="updateProject('genre',this.value)" style="width:100%;margin-bottom:10px">${selOpts(GENRES,p.genre)}</select>
+        <label class="label">연재 상태</label>
+        <select onchange="updateProject('status',this.value)" style="width:100%;margin-bottom:10px">${selOpts(STATUSES,p.status)}</select>
+        <label class="label">줄거리</label>
+        <textarea rows="6" oninput="updateProject('synopsis',this.value)" style="width:100%;margin-bottom:10px">${esc(p.synopsis||'')}</textarea>
+        <label class="label">작가 메모</label>
+        <textarea rows="4" oninput="updateProject('memo',this.value)" style="width:100%">${esc(p.memo||'')}</textarea>`;
+      return;
+    }
     el.innerHTML = `
       <div style="margin-bottom:14px">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:4px">작품 제목</div>
@@ -6110,7 +6153,7 @@ function renderSplitContent() {
           <div style="font-size:13px;line-height:1.8;color:var(--muted);white-space:pre-wrap">${esc(p.memo)}</div>
         </div>` : ''}
       <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
-        <button class="btn btn-outline btn-sm" onclick="navigate('overview')" style="font-size:11px">✏️ 작품 개요 편집</button>
+        <button class="btn btn-outline btn-sm" onclick="splitOverviewEditing=true;refreshSplitPanel()" style="font-size:11px">✏️ 이 패널에서 편집</button>
       </div>
     `;
 
@@ -6246,42 +6289,31 @@ function renderSplitContent() {
   } else if (splitTab === 'relations') {
     const chars = p.characters || [];
     const rels = p.relations || [];
-    if (!chars.length) {
-      el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">등장인물을 먼저 추가해주세요</div>';
-      return;
-    }
-    if (!rels.length) {
-      el.innerHTML = `<div style="text-align:center;padding:20px">
-        <div style="font-size:13px;color:var(--muted);margin-bottom:10px">등록된 관계가 없어요</div>
-        <button class="btn btn-gold btn-sm" onclick="navigate('relations')">🔗 인물관계도 편집</button>
+    if (chars.length < 2) {
+      el.innerHTML = `<div style="text-align:center;padding:20px;font-size:13px;color:var(--muted)">
+        관계를 만들려면 인물이 두 명 이상 필요해요.<br>
+        <button class="btn btn-gold btn-sm" style="margin-top:10px" onclick="showCharModal()">＋ 인물 추가</button>
       </div>`;
       return;
     }
-    // 인물별로 관계 그룹핑
+    const charOpts = chars.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
     el.innerHTML = `
-      <div style="margin-bottom:12px;display:flex;justify-content:flex-end">
-        <button class="btn btn-outline btn-sm" onclick="navigate('relations')" style="font-size:11px">✏️ 편집</button>
+      <div style="display:grid;gap:7px;margin-bottom:16px;padding:10px;background:var(--cream);border-radius:8px">
+        <strong style="font-size:12px">관계 추가</strong>
+        <select id="split-rel-from" aria-label="인물 A"><option value="">인물 A 선택</option>${charOpts}</select>
+        <input id="split-rel-type" aria-label="관계 유형" placeholder="관계 유형 (예: 동료, 라이벌)">
+        <select id="split-rel-to" aria-label="인물 B"><option value="">인물 B 선택</option>${charOpts}</select>
+        <button class="btn btn-gold btn-sm" onclick="addSplitRelation()">＋ 관계 추가</button>
       </div>
-      ${chars.map(c => {
-        const charRels = rels.filter(r => r.from === c.name || r.to === c.name);
-        if (!charRels.length) return '';
-        return `
-          <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:${c.color || (c.group ? getGroupColor(c.group) : 'var(--white)')}">
-            <div style="padding:7px 12px;background:rgba(0,0,0,.04);font-weight:700;font-size:13px">${esc(c.name)}</div>
-            <div style="padding:8px 12px">
-              ${charRels.map(r => {
-                const isFrom = r.from === c.name;
-                const other = isFrom ? r.to : r.from;
-                const arrow = isFrom ? '→' : '←';
-                return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;border-bottom:1px solid rgba(0,0,0,.05)">
-                  <span style="color:var(--muted)">${arrow}</span>
-                  <span style="font-weight:600">${esc(other)}</span>
-                  <span style="color:var(--teal);font-size:11px">${esc(r.type)}</span>
-                </div>`;
-              }).join('')}
-            </div>
-          </div>`;
-      }).filter(Boolean).join('')}
+      <strong style="font-size:12px">관계 목록 (${rels.length})</strong>
+      ${rels.length ? rels.map((r,i) => `
+        <div style="display:flex;align-items:center;gap:5px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
+          <span style="font-weight:600">${esc(r.from)}</span>
+          <span style="color:var(--teal)">${esc(r.type)}</span>
+          <span style="font-weight:600">${esc(r.to)}</span>
+          <button onclick="deleteSplitRelation(${i})" aria-label="${esc(r.from)}와 ${esc(r.to)}의 관계 삭제"
+            style="margin-left:auto;background:none;border:none;color:var(--rust);cursor:pointer;font-size:16px">×</button>
+        </div>`).join('') : '<div style="font-size:12px;color:var(--muted);padding:10px 0">등록된 관계가 없어요</div>'}
     `;
 
   } else if (splitTab === 'family') {
@@ -6351,7 +6383,7 @@ function renderSplitContent() {
       + '<div style="position:relative;margin-bottom:10px">'
       + '<input id="split-item-search" placeholder="아이템 검색..." value="' + esc(window._splitItemQ) + '" '
       + 'style="width:100%;padding:6px 28px 6px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px;background:var(--paper);color:var(--ink);font-family:\'Noto Sans KR\',sans-serif;outline:none">'
-      + '<button id="split-item-clear" onclick="window._splitItemQ=\'\';document.getElementById(\'split-item-search\').value=\'\';refreshSplitItems()" '
+      + '<button id="split-item-clear" onclick="window._splitItemQ=\'\';splitElement(\'split-item-search\').value=\'\';refreshSplitItems()" '
       + 'style="display:' + (sq?'block':'none') + ';position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:13px;color:var(--muted)">×</button>'
       + '</div>'
       + '<div id="split-items-inner"></div>';
@@ -6369,7 +6401,7 @@ function renderSplitContent() {
       <div style="position:relative;margin-bottom:10px">
         <input id="split-memo-search" placeholder="메모 검색..." value="${esc(window._spMemoQ)}"
           style="width:100%;padding:6px 28px 6px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px;background:var(--paper);color:var(--ink);font-family:'Noto Sans KR',sans-serif;outline:none">
-        <button id="split-memo-clear" onclick="window._spMemoQ='';document.getElementById('split-memo-search').value='';refreshSplitMemo()"
+        <button id="split-memo-clear" onclick="window._spMemoQ='';splitElement('split-memo-search').value='';refreshSplitMemo()"
           style="display:${mq?'block':'none'};position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:13px;color:var(--muted)">×</button>
       </div>
       <div id="split-memo-inner"></div>`;
@@ -6377,6 +6409,30 @@ function renderSplitContent() {
   } else if (splitTab === 'glossary') {
     el.innerHTML = renderSplitGlossary();
   }
+}
+
+function addSplitRelation() {
+  const from = splitElement('split-rel-from')?.value || '';
+  const to = splitElement('split-rel-to')?.value || '';
+  const type = splitElement('split-rel-type')?.value.trim() || '';
+  if (!from || !to || !type) { toast('인물과 관계 유형을 모두 입력해주세요.'); return; }
+  if (from === to) { toast('같은 인물은 선택할 수 없습니다.'); return; }
+  const p = getProject();
+  if (!p) return;
+  if (!p.relations) p.relations = [];
+  p.relations.push({ from, to, type });
+  autoSave();
+  refreshSplitPanel();
+}
+
+function deleteSplitRelation(index) {
+  confirmDialog('이 관계를 삭제할까요?', () => {
+    const p = getProject();
+    if (!p?.relations?.[index]) return;
+    p.relations.splice(index, 1);
+    autoSave();
+    refreshSplitPanel();
+  });
 }
 
 
@@ -6480,7 +6536,7 @@ function renderSplitGlossary() {
     + '<div style="position:relative;flex:1">'
     + '<input id="split-glossary-search" placeholder="용어 검색..." value="' + esc(window._glossaryPanelQ) + '" '
     + 'style="width:100%;padding:6px 28px 6px 10px;font-size:12px">'
-    + '<button id="split-glossary-clear" onclick="window._glossaryPanelQ=\'\';document.getElementById(\'split-glossary-search\').value=\'\';refreshSplitGlossaryCards()" '
+    + '<button id="split-glossary-clear" onclick="window._glossaryPanelQ=\'\';splitElement(\'split-glossary-search\').value=\'\';refreshSplitGlossaryCards()" '
     + 'style="display:' + (window._glossaryPanelQ ? 'block' : 'none') + ';position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:13px;color:var(--muted)">×</button>'
     + '</div>'
     + '<button class="btn btn-gold btn-sm" onclick="showGlossaryModal()">＋</button>'
@@ -6555,15 +6611,15 @@ function refreshSplitGlossaryCards() {
           + '</div></div></div>';
       }).join('');
 
-  const cardsEl = document.getElementById('split-glossary-cards');
+  const cardsEl = splitElement('split-glossary-cards');
   if (cardsEl) cardsEl.innerHTML = cards;
 
   // × 버튼 표시/숨김
-  const clr = document.getElementById('split-glossary-clear');
+  const clr = splitElement('split-glossary-clear');
   if (clr) clr.style.display = q ? 'block' : 'none';
 
   // 카테고리 버튼 업데이트
-  const catsEl = document.getElementById('split-glossary-cats');
+  const catsEl = splitElement('split-glossary-cats');
   if (catsEl) {
     const catBtns = ['전체', ...GLOSSARY_CATS].map(c =>
       '<button onclick="window._glossaryPanelCat=\'' + c + '\';refreshSplitGlossaryCards()" '
@@ -6578,32 +6634,30 @@ function refreshSplitGlossaryCards() {
 
 function refreshSplitGlossary() {
   // split-glossary-wrap이 있으면 카드만 업데이트, 없으면 전체 재렌더
-  if (document.getElementById('split-glossary-cards')) {
+  if (splitElement('split-glossary-cards')) {
     refreshSplitGlossaryCards();
   } else {
-    const el = document.getElementById('split-content');
-    if (el && splitTab === 'glossary') el.innerHTML = renderSplitGlossary();
-  }
-  // 집중 모드 참고 패널
-  const fel = document.getElementById('focus-ref-content');
-  if (fel && _focusRefTab === 'glossary') {
-    if (fel.querySelector('#split-glossary-cards')) refreshSplitGlossaryCards();
-    else fel.innerHTML = renderSplitGlossary();
+    if (document.getElementById('focus-overlay')?.classList.contains('active')) {
+      if (_focusRefTab === 'glossary') focusRefTab('glossary');
+    } else {
+      const el = document.getElementById('split-content');
+      if (el && splitTab === 'glossary') el.innerHTML = renderSplitGlossary();
+    }
   }
 }
 
 function saveSplitGlossary(idx) {
   const p = getProject();
   if (!p || !p.glossary || !p.glossary[idx]) return;
-  const term = document.getElementById('sg-term-' + idx)?.value.trim();
+  const term = splitElement('sg-term-' + idx)?.value.trim();
   if (!term) { toast('용어명을 입력해주세요.'); return; }
   p.glossary[idx] = {
     ...p.glossary[idx],
     term,
-    cat: document.getElementById('sg-cat-' + idx)?.value || p.glossary[idx].cat,
-    alias: document.getElementById('sg-alias-' + idx)?.value.trim() || '',
-    desc: document.getElementById('sg-desc-' + idx)?.value.trim() || '',
-    related: document.getElementById('sg-related-' + idx)?.value.trim() || '',
+    cat: splitElement('sg-cat-' + idx)?.value || p.glossary[idx].cat,
+    alias: splitElement('sg-alias-' + idx)?.value.trim() || '',
+    desc: splitElement('sg-desc-' + idx)?.value.trim() || '',
+    related: splitElement('sg-related-' + idx)?.value.trim() || '',
   };
   window._glossaryPanelEdit[idx] = false;
   autoSave(); updateBadges(); refreshSplitGlossary();
@@ -6751,7 +6805,7 @@ function focusRefTab(tab) {
   _focusRefTab = tab;
   const tabLabelMap = {
     overview:'개요', world:'세계관', plot:'플롯',
-    characters:'인물', family:'가문', glossary:'용어', items:'아이템', memo:'메모'
+    characters:'인물', relations:'관계도', family:'가문', glossary:'용어', items:'아이템', memo:'메모'
   };
   const label = tabLabelMap[tab];
   document.querySelectorAll('#focus-ref-panel .split-tab').forEach(b => {
@@ -7164,10 +7218,10 @@ function refreshSplitPanel() {
     focusRefTab(_focusRefTab);
   } else {
     // 검색 input이 있는 탭은 내부 콘텐츠만 업데이트 (포커스 유지)
-    if (splitTab === 'items' && document.getElementById('split-item-search')) {
+    if (splitTab === 'items' && splitElement('split-item-search')) {
       refreshSplitItems(); return;
     }
-    if (splitTab === 'memo' && document.getElementById('split-memo-search')) {
+    if (splitTab === 'memo' && splitElement('split-memo-search')) {
       refreshSplitMemo(); return;
     }
     renderSplitContent();
@@ -7175,9 +7229,8 @@ function refreshSplitPanel() {
 }
 
 function refreshSplitItems() {
-  const el = document.getElementById('split-content');
-  if (!el) return;
   const p = getProject();
+  if (!p) return;
   const items = p.items || [];
   if (!window._splitItemCollapsed) window._splitItemCollapsed = {};
   const sq = (window._splitItemQ || '').trim().toLowerCase();
@@ -7185,11 +7238,11 @@ function refreshSplitItems() {
   const usedCats = ITEM_CATS.filter(c => filtered.some(it => it.cat === c));
   const catGroups = usedCats.map(c => ({ cat: c, list: filtered.filter(it => it.cat === c) }));
 
-  const inner = document.getElementById('split-items-inner');
-  if (!inner) { renderSplitContent(); return; }
+  const inner = splitElement('split-items-inner');
+  if (!inner) { refreshSplitPanel(); return; }
 
   // × 버튼 표시/숨김
-  const clr = document.getElementById('split-item-clear');
+  const clr = splitElement('split-item-clear');
   if (clr) clr.style.display = sq ? 'block' : 'none';
 
   inner.innerHTML = filtered.length === 0
@@ -7221,14 +7274,14 @@ function refreshSplitItems() {
 }
 
 function refreshSplitMemo() {
-  const inner = document.getElementById('split-memo-inner');
-  if (!inner) { renderSplitContent(); return; }
+  const inner = splitElement('split-memo-inner');
+  if (!inner) { refreshSplitPanel(); return; }
   const allMemos = getChapterMemos();
   if (!window._spMemoCol) window._spMemoCol = {};
   const mq = (window._spMemoQ || '').trim().toLowerCase();
   const memos = mq ? allMemos.filter(m => (m.title||'').toLowerCase().includes(mq) || (m.content||'').toLowerCase().includes(mq)) : allMemos;
 
-  const clr = document.getElementById('split-memo-clear');
+  const clr = splitElement('split-memo-clear');
   if (clr) clr.style.display = mq ? 'block' : 'none';
 
   inner.innerHTML = memos.length === 0

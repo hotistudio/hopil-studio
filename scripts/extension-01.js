@@ -23,10 +23,10 @@ let pomoState = window.pomoState = {
 // ═══════════════════════════════════════════════════════════
 const _searchHandlers = {
   'glossary-search-input':  () => { window._glossarySearch = document.getElementById('glossary-search-input').value; renderGlossaryCards(); },
-  'split-glossary-search':  () => { window._glossaryPanelQ = document.getElementById('split-glossary-search')?.value || ''; refreshSplitGlossaryCards(); },
+  'split-glossary-search':  () => { window._glossaryPanelQ = splitElement('split-glossary-search')?.value || ''; refreshSplitGlossaryCards(); },
   'item-search-input':      () => { window._itemSearch = document.getElementById('item-search-input').value; renderItemGrid(); },
-  'split-item-search':      () => { window._splitItemQ = document.getElementById('split-item-search')?.value || ''; refreshSplitItems(); },
-  'split-memo-search':      () => { window._spMemoQ = document.getElementById('split-memo-search')?.value || ''; refreshSplitMemo(); },
+  'split-item-search':      () => { window._splitItemQ = splitElement('split-item-search')?.value || ''; refreshSplitItems(); },
+  'split-memo-search':      () => { window._spMemoQ = splitElement('split-memo-search')?.value || ''; refreshSplitMemo(); },
   'fr-find':                () => { frHighlight(false); },
 };
 
