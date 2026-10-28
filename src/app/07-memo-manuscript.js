@@ -727,6 +727,9 @@ function showExportModal() {
       <button class="btn btn-outline" onclick="exportDocx(document.getElementById('exp-ch').value)" style="justify-content:center;font-size:14px;padding:12px">
         📝 DOCX (Word) 파일로 저장
       </button>
+      <button class="btn btn-outline" onclick="exportHwpx(document.getElementById('exp-ch').value)" style="justify-content:center;font-size:14px;padding:12px">
+        📖 HWPX (한글·화면 양식 적용) 저장
+      </button>
       <button class="btn btn-outline" onclick="exportData()" style="justify-content:center;font-size:14px;padding:12px;border-color:var(--teal);color:var(--teal)">
         💾 JSON 백업 저장 (전체 데이터)
       </button>
@@ -735,6 +738,7 @@ function showExportModal() {
       💡 <b>클립보드 복사</b>: 카카오페이지·리디 등 웹 에디터에 바로 붙여넣기<br>
       💡 <b>TXT</b>: 메모장·기타 도구에서 열기<br>
       💡 <b>DOCX</b>: MS Word·한컴오피스에서 열기<br>
+      💡 <b>HWPX</b>: 현재 화면 양식의 글꼴·크기·행간·본문색·용지색을 한글 문서에 적용<br>
       💡 <b>JSON</b>: 앱 데이터 전체 백업 (캐릭터·플롯 포함)
     </div>
     <div class="modal-footer">
@@ -759,6 +763,9 @@ function showChExportMenu(chId) {
       </button>
       <button class="btn btn-outline" onclick="exportDocx('${chId}');closeModal()" style="justify-content:center;font-size:14px;padding:12px">
         📝 DOCX 저장
+      </button>
+      <button class="btn btn-outline" onclick="exportHwpx('${chId}');closeModal()" style="justify-content:center;font-size:14px;padding:12px">
+        📖 HWPX (화면 양식 적용) 저장
       </button>
     </div>
     <div class="modal-footer">

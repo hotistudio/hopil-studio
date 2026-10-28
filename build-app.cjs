@@ -11,6 +11,7 @@ const parts = [
   '06-diagram.js',
   '07-memo-manuscript.js',
   '08-features.js',
+  '08-hwpx-export.js',
   '09-init.js'
 ];
 const output = parts.map(name => fs.readFileSync(`src/app/${name}`, 'utf8')).join('');
