@@ -1663,7 +1663,7 @@ function renderHome() {
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
         <p style="font-size:11px;color:var(--muted);opacity:.6;line-height:1.8">
-          호필 스튜디오 v0.6.19 beta · © 2026 호백<br>
+          호필 스튜디오 v0.6.20 beta · © 2026 호백<br>
           <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
             style="color:var(--muted);text-decoration:none;opacity:.8">CC BY-NC 4.0</a>
           · 비상업적 목적에 한해 자유롭게 사용 가능<br>
@@ -2970,6 +2970,59 @@ function deleteWorld(idx) {
 // ═══════════════════════════════════════════════════════════════
 // PLOT
 // ═══════════════════════════════════════════════════════════════
+let plotViewMode = 'arcs';
+
+function setPlotViewMode(mode) {
+  plotViewMode = mode === 'flow' ? 'flow' : 'arcs';
+  renderPlot();
+}
+
+function buildPlotFlow(project) {
+  const chapters = (project.chapters || []).filter(c => !c.isFolder);
+  const groups = chapters.map((chapter, index) => ({ chapter, number: index + 1, scenes: [] }));
+  const byChapter = new Map(groups.map(group => [group.chapter.id, group]));
+  const unlinked = [];
+  (project.arcs || []).forEach((arc, arcIndex) => {
+    (arc.scenes || []).forEach((scene, sceneIndex) => {
+      const entry = { scene, arc, arcIndex, sceneIndex };
+      const group = byChapter.get(scene.chapterId);
+      if (group) group.scenes.push(entry);
+      else unlinked.push(entry);
+    });
+  });
+  return { groups, unlinked };
+}
+
+function renderPlotFlow(project) {
+  const { groups, unlinked } = buildPlotFlow(project);
+  const sceneCard = ({ scene, arc, arcIndex, sceneIndex }) => `
+    <button class="plot-flow-scene" onclick="showSceneModal(${arcIndex},${sceneIndex})" title="장면 수정">
+      <span class="plot-flow-scene-heading"><strong>${esc(scene.title)}</strong><span class="scene-card-type">${esc(scene.type || '')}</span></span>
+      <span class="plot-flow-arc">${esc(arc.title)} · 장면 ${sceneIndex + 1}</span>
+      ${scene.summary ? `<span class="plot-flow-summary">${esc(scene.summary)}</span>` : ''}
+    </button>`;
+  return `
+    <p class="plot-flow-help">화 순서로 연결된 장면을 확인하세요. 같은 화의 장면은 아크와 아크 내 장면 순서로 표시됩니다. 장면을 누르면 연결된 화를 바꿀 수 있습니다.</p>
+    <div class="plot-flow-list">
+      ${groups.map(group => `
+        <section class="plot-flow-group">
+          <div class="plot-flow-heading">
+            <span><strong>${group.number}화 · ${esc(group.chapter.title)}</strong><small>장면 ${group.scenes.length}개</small></span>
+            <button class="btn btn-outline btn-sm" onclick="gotoChapterFromScene('${esc(group.chapter.id)}')">집필로 이동</button>
+          </div>
+          ${group.scenes.length
+            ? `<div class="plot-flow-scenes">${group.scenes.map(sceneCard).join('')}</div>`
+            : '<p class="plot-flow-empty">연결된 장면이 없습니다.</p>'}
+        </section>`).join('')}
+      <section class="plot-flow-group plot-flow-unlinked">
+        <div class="plot-flow-heading"><span><strong>화에 연결되지 않은 장면</strong><small>장면 ${unlinked.length}개</small></span></div>
+        ${unlinked.length
+          ? `<div class="plot-flow-scenes">${unlinked.map(sceneCard).join('')}</div>`
+          : '<p class="plot-flow-empty">연결되지 않은 장면이 없습니다.</p>'}
+      </section>
+    </div>`;
+}
+
 function renderPlot() {
   const p = getProject();
   const arcs = p.arcs || [];
@@ -3040,9 +3093,13 @@ function renderPlot() {
       </div>
       ${arcs.length === 0
         ? `<div class="card empty-state"><div class="emoji">🗺️</div><p>스토리 아크를 추가하고<br>장면을 구성해보세요.</p></div>`
-        : `<div class="arc-list">${cols}</div>`}
+        : `<div class="plot-view-switch" role="group" aria-label="플롯 보기 방식">
+            <button class="plot-view-button ${plotViewMode === 'arcs' ? 'active' : ''}" aria-pressed="${plotViewMode === 'arcs'}" onclick="setPlotViewMode('arcs')">아크별 보기</button>
+            <button class="plot-view-button ${plotViewMode === 'flow' ? 'active' : ''}" aria-pressed="${plotViewMode === 'flow'}" onclick="setPlotViewMode('flow')">전체 흐름</button>
+          </div>
+          ${plotViewMode === 'flow' ? renderPlotFlow(p) : `<div class="arc-list">${cols}</div>`}`}
     </div>`;
-  setTimeout(initSceneDrag, 50);
+  if (plotViewMode === 'arcs') setTimeout(initSceneDrag, 50);
 }
 
 function showArcModal(idx) {
