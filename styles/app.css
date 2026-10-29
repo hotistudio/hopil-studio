@@ -317,6 +317,8 @@ html[data-reader-style="ridi"]{--reader-paper:#f9f3e8;--reader-surround:#eae5db;
   --reader-ink:#302920;--reader-font:'Noto Serif KR',serif;--reader-line:2.05;--reader-width:720px}
 html[data-reader-style="naver"]{--reader-paper:#fff;--reader-surround:#edf2ef;
   --reader-ink:#202a24;--reader-font:'Noto Sans KR',sans-serif;--reader-line:1.85;--reader-width:700px}
+html[data-reader-style="forest"]{--reader-paper:#17382e;--reader-surround:#0d251e;
+  --reader-ink:#e5ede6;--reader-font:'Noto Serif KR',serif;--reader-line:2;--reader-width:720px}
 html[data-reader-style]:not([data-reader-style="default"]) .editor-content,
 html[data-reader-style]:not([data-reader-style="default"]) #focus-editor-wrap{
   background:var(--reader-surround)}
@@ -336,6 +338,8 @@ html[data-theme="dark"][data-reader-style]:not([data-reader-style="default"]) #f
 html[data-theme="dark"][data-reader-style]:not([data-reader-style="default"]) #prose-editor,
 html[data-theme="dark"][data-reader-style]:not([data-reader-style="default"]) #focus-editor{
   background:var(--reader-paper) !important;color:var(--reader-ink) !important}
+html[data-reader-style="forest"] #prose-editor::placeholder,
+html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacity:1}
 @media(max-width:600px){
   html[data-reader-style]:not([data-reader-style="default"]) #prose-editor,
   html[data-reader-style]:not([data-reader-style="default"]) #focus-editor{padding:20px 18px}

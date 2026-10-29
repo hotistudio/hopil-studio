@@ -324,6 +324,7 @@ const READER_STYLES = [
   { id: 'kakao', label: '카카오페이지풍' },
   { id: 'ridi', label: '리디풍' },
   { id: 'naver', label: '네이버 시리즈풍' },
+  { id: 'forest', label: '짙은 녹색' },
 ];
 let readerStyle = 'default';
 try {

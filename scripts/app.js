@@ -1663,7 +1663,7 @@ function renderHome() {
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
         <p style="font-size:11px;color:var(--muted);opacity:.6;line-height:1.8">
-          호필 스튜디오 v0.6.16 beta · © 2026 호백<br>
+          호필 스튜디오 v0.6.17 beta · © 2026 호백<br>
           <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
             style="color:var(--muted);text-decoration:none;opacity:.8">CC BY-NC 4.0</a>
           · 비상업적 목적에 한해 자유롭게 사용 가능<br>
@@ -8107,6 +8107,7 @@ const READER_STYLES = [
   { id: 'kakao', label: '카카오페이지풍' },
   { id: 'ridi', label: '리디풍' },
   { id: 'naver', label: '네이버 시리즈풍' },
+  { id: 'forest', label: '짙은 녹색' },
 ];
 let readerStyle = 'default';
 try {
@@ -11726,7 +11727,8 @@ const HWPX_STYLES = {
   default: { font: 1, color: '#302920', paper: '#FFFFFF', line: 200, margin: 8504 },
   kakao: { font: 0, color: '#2C2925', paper: '#FFFDF7', line: 190, margin: 5668 },
   ridi: { font: 1, color: '#302920', paper: '#F9F3E8', line: 205, margin: 5102 },
-  naver: { font: 0, color: '#202A24', paper: '#FFFFFF', line: 185, margin: 5385 }
+  naver: { font: 0, color: '#202A24', paper: '#FFFFFF', line: 185, margin: 5385 },
+  forest: { font: 1, color: '#E5EDE6', paper: '#17382E', line: 200, margin: 5102 }
 };
 
 function hwpxParse(xml) {

@@ -28,9 +28,13 @@ assert.equal(saved.get('hopil_studio_reader_style'), 'naver');
 assert.equal(applied, 'naver');
 vm.runInContext("changeReaderStyle('unknown')", context);
 assert.equal(applied, 'naver');
+vm.runInContext("changeReaderStyle('forest')", context);
+assert.equal(saved.get('hopil_studio_reader_style'), 'forest');
+assert.deepEqual(selects.map(select => select.value), ['forest', 'forest']);
+assert.match(vm.runInContext('readerStyleOptions()', context), /value="forest" selected/);
 
 const css = fs.readFileSync('styles/app.css', 'utf8');
-for (const name of ['kakao', 'ridi', 'naver']) {
+for (const name of ['kakao', 'ridi', 'naver', 'forest']) {
   assert(css.includes(`data-reader-style="${name}"`));
 }
 console.log('Reader style selection, persistence, and presets passed.');

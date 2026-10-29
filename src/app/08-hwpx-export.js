@@ -10,7 +10,8 @@ const HWPX_STYLES = {
   default: { font: 1, color: '#302920', paper: '#FFFFFF', line: 200, margin: 8504 },
   kakao: { font: 0, color: '#2C2925', paper: '#FFFDF7', line: 190, margin: 5668 },
   ridi: { font: 1, color: '#302920', paper: '#F9F3E8', line: 205, margin: 5102 },
-  naver: { font: 0, color: '#202A24', paper: '#FFFFFF', line: 185, margin: 5385 }
+  naver: { font: 0, color: '#202A24', paper: '#FFFFFF', line: 185, margin: 5385 },
+  forest: { font: 1, color: '#E5EDE6', paper: '#17382E', line: 200, margin: 5102 }
 };
 
 function hwpxParse(xml) {
