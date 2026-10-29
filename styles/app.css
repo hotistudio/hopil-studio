@@ -326,6 +326,16 @@ html[data-reader-style]:not([data-reader-style="default"]) #focus-editor{
   border-radius:6px;background:var(--reader-paper);color:var(--reader-ink) !important;
   font-family:var(--reader-font);line-height:var(--reader-line);
   box-shadow:0 3px 16px rgba(0,0,0,.08)}
+/* 다크모드의 공통 textarea 배경보다 집필 화면 양식의 종이색을 우선한다. */
+html[data-theme="dark"] #prose-editor,
+html[data-theme="dark"] #focus-editor{
+  background:var(--paper) !important;color:var(--ink) !important}
+html[data-theme="dark"][data-reader-style]:not([data-reader-style="default"]) .editor-content,
+html[data-theme="dark"][data-reader-style]:not([data-reader-style="default"]) #focus-editor-wrap{
+  background:var(--reader-surround) !important}
+html[data-theme="dark"][data-reader-style]:not([data-reader-style="default"]) #prose-editor,
+html[data-theme="dark"][data-reader-style]:not([data-reader-style="default"]) #focus-editor{
+  background:var(--reader-paper) !important;color:var(--reader-ink) !important}
 @media(max-width:600px){
   html[data-reader-style]:not([data-reader-style="default"]) #prose-editor,
   html[data-reader-style]:not([data-reader-style="default"]) #focus-editor{padding:20px 18px}
