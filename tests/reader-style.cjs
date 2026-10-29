@@ -37,4 +37,6 @@ const css = fs.readFileSync('styles/app.css', 'utf8');
 for (const name of ['kakao', 'ridi', 'naver', 'forest']) {
   assert(css.includes(`data-reader-style="${name}"`));
 }
+assert.match(css, /data-reader-style="forest"\]\{--reader-paper:(#[0-9a-f]+);--reader-surround:\1;/);
+assert.match(css, /data-reader-style="forest"\] #focus-editor\{box-shadow:none;border-radius:0\}/);
 console.log('Reader style selection, persistence, and presets passed.');
