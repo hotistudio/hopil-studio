@@ -10,8 +10,10 @@ const project = {
     { id: 'c3', title: '결말' }
   ],
   arcs: [{ title: '1부', scenes: [
-    { title: '만남', chapterId: 'c1' },
+    { title: '만남', chapterId: 'c1', chapterOrder: 2 },
     { title: '미배치 장면', chapterId: '' }
+  ] }, { title: '조연', scenes: [
+    { title: '교차 장면', chapterId: 'c1', chapterOrder: 1 }
   ] }],
   psyArcs: [{ title: '성장', steps: [
     { title: '결심', chapterId: 'c2' },
@@ -39,11 +41,14 @@ const context = vm.createContext({
   showForeshadowModal: id => calls.push(['foreshadow', id]),
   gotoChapterFromScene: id => calls.push(['chapter', id])
 });
+vm.runInContext(fs.readFileSync('src/app/04-world-plot.js', 'utf8'), context);
 vm.runInContext(fs.readFileSync('src/app/08-narrative-timeline.js', 'utf8'), context);
+context.showSceneModal = (...args) => calls.push(['scene', ...args]);
 
 const data = context.buildNarrativeTimeline(project, {});
 assert.equal(data.rows.length, 3);
-assert.equal(data.rows[0].lanes.plot[0].title, '만남');
+assert.deepEqual(Array.from(data.rows[0].lanes.plot, item => item.title), ['교차 장면', '만남']);
+assert.equal(data.rows[0].lanes.plot[0].detail, '1번째 · 조연');
 assert.equal(data.rows[0].lanes.foreshadow[0].detail, '🌱 첫 등장');
 assert.equal(data.rows[1].lanes.psy[0].detail, '주인공');
 assert.equal(data.rows[1].lanes.foreshadow[0].detail, '💬 중간 언급');

@@ -503,18 +503,22 @@ html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacit
 .plot-view-button{border:0;border-radius:6px;background:transparent;color:var(--muted);
   padding:7px 13px;font:600 12px 'Noto Sans KR',sans-serif;cursor:pointer}
 .plot-view-button.active{background:var(--white);color:var(--gold);box-shadow:0 1px 4px var(--shadow)}
-.plot-view-button:focus-visible,.plot-flow-scene:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.plot-view-button:focus-visible,.plot-flow-scene:focus-visible,.plot-flow-order-controls button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .plot-flow-help{font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5}
 .plot-flow-list{display:flex;flex-direction:column;gap:12px;max-width:900px}
 .plot-flow-group{border:1px solid var(--border);border-radius:10px;background:var(--cream);padding:14px}
 .plot-flow-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
 .plot-flow-heading strong{font-size:14px}
 .plot-flow-heading small{display:block;margin-top:3px;color:var(--muted);font-size:11px}
-.plot-flow-scenes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.plot-flow-scenes{display:flex;flex-direction:column;gap:8px}
+.plot-flow-item{display:flex;align-items:stretch;gap:6px;min-width:0}
 .plot-flow-scene{display:flex;flex-direction:column;align-items:flex-start;gap:5px;width:100%;
   min-width:0;text-align:left;padding:11px 12px;border:1px solid var(--border);border-radius:8px;
   background:var(--white);color:var(--ink);font-family:'Noto Sans KR',sans-serif;cursor:pointer}
 .plot-flow-scene:hover{border-color:var(--gold);box-shadow:0 2px 8px var(--shadow)}
+.plot-flow-order-controls{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+.plot-flow-order-controls button{min-width:36px;min-height:36px;border:1px solid var(--border);border-radius:7px;background:var(--white);color:var(--ink);font-size:17px;cursor:pointer}
+.plot-flow-order-controls button:disabled{opacity:.35;cursor:default}
 .plot-flow-scene-heading{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
 .plot-flow-scene-heading strong{font-size:12px;overflow-wrap:anywhere}
 .plot-flow-arc{font-size:11px;color:var(--gold)}

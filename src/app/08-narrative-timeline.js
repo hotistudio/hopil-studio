@@ -12,14 +12,19 @@ function buildNarrativeTimeline(project, foreshadowIndex) {
     (row ? row.lanes : unlinked)[lane].push(item);
   }
 
-  (project.arcs || []).forEach((arc, arcIndex) => {
-    (arc.scenes || []).forEach((scene, itemIndex) => add(scene.chapterId, 'plot', {
+  const plotFlow = buildPlotFlow(project);
+  function addPlotScene({ scene, arc, arcIndex, sceneIndex }, chapterId, order) {
+    add(chapterId, 'plot', {
       title: scene.title || '제목 없는 장면',
-      detail: arc.title || '플롯 아크',
+      detail: `${order ? `${order}번째 · ` : ''}${arc.title || '플롯 아크'}`,
       sub: scene.type || '',
-      source: 'plot', arcIndex, itemIndex
-    }));
-  });
+      source: 'plot', arcIndex, itemIndex: sceneIndex
+    });
+  }
+  plotFlow.groups.forEach(group => group.scenes.forEach((entry, index) => {
+    addPlotScene(entry, group.chapter.id, index + 1);
+  }));
+  plotFlow.unlinked.forEach(entry => addPlotScene(entry, null, null));
 
   (project.psyArcs || []).forEach((arc, arcIndex) => {
     const character = getPsyArcCharacter(arc, project);

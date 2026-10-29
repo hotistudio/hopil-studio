@@ -342,27 +342,65 @@ function buildPlotFlow(project) {
   const groups = chapters.map((chapter, index) => ({ chapter, number: index + 1, scenes: [] }));
   const byChapter = new Map(groups.map(group => [group.chapter.id, group]));
   const unlinked = [];
+  let sourceOrder = 0;
   (project.arcs || []).forEach((arc, arcIndex) => {
     (arc.scenes || []).forEach((scene, sceneIndex) => {
-      const entry = { scene, arc, arcIndex, sceneIndex };
+      const entry = { scene, arc, arcIndex, sceneIndex, sourceOrder: sourceOrder++ };
       const group = byChapter.get(scene.chapterId);
-      if (group) group.scenes.push(entry);
+      if (group) {
+        entry.legacyOrder = group.scenes.length + 1;
+        group.scenes.push(entry);
+      }
       else unlinked.push(entry);
     });
   });
+  groups.forEach(group => group.scenes.sort((a, b) => {
+    const orderA = Number.isFinite(a.scene.chapterOrder) && a.scene.chapterOrder > 0
+      ? a.scene.chapterOrder : a.legacyOrder;
+    const orderB = Number.isFinite(b.scene.chapterOrder) && b.scene.chapterOrder > 0
+      ? b.scene.chapterOrder : b.legacyOrder;
+    return orderA - orderB || a.sourceOrder - b.sourceOrder;
+  }));
   return { groups, unlinked };
+}
+
+function movePlotSceneInChapter(chapterIndex, arcIndex, sceneIndex, direction) {
+  const project = getProject();
+  const chapterId = (project.chapters || []).filter(chapter => !chapter.isFolder)[chapterIndex]?.id;
+  if (!chapterId) return;
+  const group = buildPlotFlow(project).groups.find(group => group.chapter.id === chapterId);
+  if (!group || (direction !== -1 && direction !== 1)) return;
+  const from = group.scenes.findIndex(entry => entry.arcIndex === arcIndex && entry.sceneIndex === sceneIndex);
+  const to = from + direction;
+  if (from < 0 || to < 0 || to >= group.scenes.length) return;
+  [group.scenes[from], group.scenes[to]] = [group.scenes[to], group.scenes[from]];
+  group.scenes.forEach((entry, index) => { entry.scene.chapterOrder = index + 1; });
+  autoSave();
+  renderPlot();
+}
+
+function nextPlotSceneChapterOrder(project, chapterId) {
+  const group = buildPlotFlow(project).groups.find(group => group.chapter.id === chapterId);
+  if (!group) return 1;
+  group.scenes.forEach((entry, index) => { entry.scene.chapterOrder = index + 1; });
+  return group.scenes.length + 1;
 }
 
 function renderPlotFlow(project) {
   const { groups, unlinked } = buildPlotFlow(project);
-  const sceneCard = ({ scene, arc, arcIndex, sceneIndex }) => `
+  const sceneCard = ({ scene, arc, arcIndex, sceneIndex }, index, group) => `<div class="plot-flow-item">
     <button class="plot-flow-scene" onclick="showSceneModal(${arcIndex},${sceneIndex})" title="장면 수정">
       <span class="plot-flow-scene-heading"><strong>${esc(scene.title)}</strong><span class="scene-card-type">${esc(scene.type || '')}</span></span>
-      <span class="plot-flow-arc">${esc(arc.title)} · 장면 ${sceneIndex + 1}</span>
+      <span class="plot-flow-arc">${group ? `${index + 1}번째 · ` : ''}${esc(arc.title)} · 아크 장면 ${sceneIndex + 1}</span>
       ${scene.summary ? `<span class="plot-flow-summary">${esc(scene.summary)}</span>` : ''}
-    </button>`;
+    </button>
+    ${group ? `<div class="plot-flow-order-controls">
+      <button type="button" onclick="movePlotSceneInChapter(${group.number - 1},${arcIndex},${sceneIndex},-1)" ${index === 0 ? 'disabled' : ''} aria-label="${esc(scene.title)} 앞 순서로 이동" title="앞 순서로 이동">↑</button>
+      <button type="button" onclick="movePlotSceneInChapter(${group.number - 1},${arcIndex},${sceneIndex},1)" ${index === group.scenes.length - 1 ? 'disabled' : ''} aria-label="${esc(scene.title)} 뒤 순서로 이동" title="뒤 순서로 이동">↓</button>
+    </div>` : ''}
+  </div>`;
   return `
-    <p class="plot-flow-help">화 순서로 연결된 장면을 확인하세요. 같은 화의 장면은 아크와 아크 내 장면 순서로 표시됩니다. 장면을 누르면 연결된 화를 바꿀 수 있습니다.</p>
+    <p class="plot-flow-help">화 안의 장면 순서를 화살표로 바꿀 수 있습니다. 이 순서는 서사 타임라인에도 표시됩니다.</p>
     <div class="plot-flow-list">
       ${groups.map(group => `
         <section class="plot-flow-group">
@@ -371,13 +409,13 @@ function renderPlotFlow(project) {
             <button class="btn btn-outline btn-sm" onclick="gotoChapterFromScene('${esc(group.chapter.id)}')">집필로 이동</button>
           </div>
           ${group.scenes.length
-            ? `<div class="plot-flow-scenes">${group.scenes.map(sceneCard).join('')}</div>`
+            ? `<div class="plot-flow-scenes">${group.scenes.map((entry, index) => sceneCard(entry, index, group)).join('')}</div>`
             : '<p class="plot-flow-empty">연결된 장면이 없습니다.</p>'}
         </section>`).join('')}
       <section class="plot-flow-group plot-flow-unlinked">
         <div class="plot-flow-heading"><span><strong>화에 연결되지 않은 장면</strong><small>장면 ${unlinked.length}개</small></span></div>
         ${unlinked.length
-          ? `<div class="plot-flow-scenes">${unlinked.map(sceneCard).join('')}</div>`
+          ? `<div class="plot-flow-scenes">${unlinked.map(entry => sceneCard(entry)).join('')}</div>`
           : '<p class="plot-flow-empty">연결되지 않은 장면이 없습니다.</p>'}
       </section>
     </div>`;
@@ -389,12 +427,16 @@ function renderPlot() {
   const chList = (p.chapters || []).filter(c => !c.isFolder);
   const chapterById = new Map();
   chList.forEach((c, i) => chapterById.set(c.id, { num: i + 1, title: c.title }));
+  const sceneOrderByRef = new Map();
+  buildPlotFlow(p).groups.forEach(group => group.scenes.forEach((entry, index) => {
+    sceneOrderByRef.set(`${entry.arcIndex}:${entry.sceneIndex}`, index + 1);
+  }));
 
   const cols = arcs.map((a, ai) => {
   const scenes = (a.scenes || []).map((s, si) => {
     const linkedCh = s.chapterId ? chapterById.get(s.chapterId) : null;
     const chapterLink = linkedCh
-      ? `<div style="font-size:10px;color:var(--gold);margin-top:4px;cursor:pointer" onclick="event.stopPropagation();gotoChapterFromScene('${esc(s.chapterId)}')" title="이 화로 이동"><span style="text-decoration:underline">🔗 ${linkedCh.num}화 · ${esc(linkedCh.title)}</span></div>`
+      ? `<div style="font-size:10px;color:var(--gold);margin-top:4px;cursor:pointer" onclick="event.stopPropagation();gotoChapterFromScene('${esc(s.chapterId)}')" title="이 화로 이동"><span style="text-decoration:underline">🔗 ${linkedCh.num}화 · ${sceneOrderByRef.get(`${ai}:${si}`) || '?'}번째 장면 · ${esc(linkedCh.title)}</span></div>`
       : '';
     return `
       <div class="scene-row" data-ai="${ai}" data-si="${si}" style="position:relative;margin-bottom:8px">
@@ -526,15 +568,22 @@ function showSceneModal(arcIdx, sceneIdx) {
 function saveScene(arcIdx, sceneIdx) {
   const title = document.getElementById('sm-title').value.trim();
   if (!title) { toast('장면 제목을 입력해주세요.'); return; }
+  const p = getProject();
+  const previous = sceneIdx !== undefined ? p.arcs[arcIdx].scenes[sceneIdx] : null;
+  const chapterId = document.getElementById('sm-chapter')?.value || '';
+  const chapterOrder = chapterId === previous?.chapterId
+    ? previous.chapterOrder
+    : chapterId ? nextPlotSceneChapterOrder(p, chapterId)
+      : undefined;
   const s = {
-    id: sceneIdx !== undefined ? getProject().arcs[arcIdx].scenes[sceneIdx].id : uid(),
+    id: previous ? previous.id : uid(),
     title,
     type: document.getElementById('sm-type').value,
-    chapterId: document.getElementById('sm-chapter')?.value || '',
+    chapterId,
+    chapterOrder,
     summary: document.getElementById('sm-sum').value,
     characters: document.getElementById('sm-chars').value,
   };
-  const p = getProject();
   if (sceneIdx !== undefined) p.arcs[arcIdx].scenes[sceneIdx] = s;
   else p.arcs[arcIdx].scenes.push(s);
   autoSave(); closeModal(); renderPlot();
