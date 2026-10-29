@@ -960,8 +960,7 @@ function buildForeshadowIndex() {
 }
 
 // 해당 복선의 심기/회수/언급 화 분류.
-// 심기 = 첫 등장 화, 회수 = 마지막 등장 화 (복선 status=='회수완료'일 때만),
-// 언급 = 그 사이 중간 등장 화들.
+// 심기는 첫 등장 화, 회수는 작가가 지정한 태그 등장 화만 사용한다.
 function classifyForeshadowChapters(foreshadow, index) {
   const tagName = (foreshadow?.tagName || '').trim();
   if (!tagName) return { planted: null, harvested: null, mentioned: [], linked: false, tagName: '' };
@@ -971,12 +970,9 @@ function classifyForeshadowChapters(foreshadow, index) {
   }
   const chIds = entry.chapters;
   const planted = chIds[0];
-  let harvested = null;
-  let mentioned = chIds.slice(1);
-  if (foreshadow.status === '회수완료' && chIds.length >= 2) {
-    harvested = chIds[chIds.length - 1];
-    mentioned = chIds.slice(1, -1);
-  }
+  const selectedHarvest = foreshadow.status === '회수완료' ? foreshadow.harvestChapterId : null;
+  const harvested = selectedHarvest && chIds.includes(selectedHarvest) ? selectedHarvest : null;
+  const mentioned = chIds.slice(1).filter(id => id !== harvested);
   return { planted, harvested, mentioned, linked: true, tagName };
 }
 
@@ -1337,8 +1333,8 @@ function renderForeshadow() {
           const mentionCount = cls.linked ? cls.mentioned.length : 0;
           // 자동 vs 수동 우선 표시 결정
           const showPlant = autoPlant || f.plant || '';
-          const showHarvest = autoHarvest || f.harvest || (st==='미회수'?'미회수':'');
-          const hasRow = cls.linked || f.plant || f.harvest;
+          const showHarvest = autoHarvest || f.harvest || (st==='미회수'?'미회수':'회수 화 미지정');
+          const hasRow = cls.linked || f.plant || f.harvest || st==='회수완료';
           return `
           <div class="card" style="margin-bottom:12px;border-left:4px solid ${STATUS_COLOR[st]}">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
@@ -1372,7 +1368,7 @@ function renderForeshadow() {
                   }
                   <span style="color:var(--border);font-size:16px">→→→</span>
                   ${autoHarvest
-                    ? `<button onclick="foreshadowJumpTo('${fsIdEsc}', 'last')" style="background:none;border:none;cursor:pointer;padding:0;font-weight:600;color:var(--teal);font-family:'Noto Sans KR',sans-serif;text-decoration:underline;text-decoration-color:rgba(20,140,120,.3);text-underline-offset:3px">${esc(autoHarvest)}</button>`
+                    ? `<button onclick="foreshadowJumpTo('${fsIdEsc}', 'harvest')" style="background:none;border:none;cursor:pointer;padding:0;font-weight:600;color:var(--teal);font-family:'Noto Sans KR',sans-serif;text-decoration:underline;text-decoration-color:rgba(20,140,120,.3);text-underline-offset:3px">${esc(autoHarvest)}</button>`
                     : `<span style="font-weight:600;color:${st==='회수완료'?'var(--teal)':'var(--ink)'}">${esc(showHarvest||'?')}</span>`
                   }
                   ${st==='회수완료'?'<span style="color:var(--teal)">✅</span>':''}
@@ -1405,7 +1401,7 @@ function renderForeshadow() {
 }
 
 // 복선 카드 → 본문의 해당 태그 위치로 이동
-// kind: 'first' = 첫 등장(심기), 'last' = 마지막 등장(회수), 'mention' = 중간 언급 n번째
+// kind: 'first' = 첫 등장(심기), 'harvest' = 지정된 회수, 'mention' = 중간 언급 n번째
 function foreshadowJumpTo(id, kind, mentionIdx) {
   const p = getProject();
   const f = p?.foreshadows?.find(x => x.id === id);
@@ -1421,17 +1417,14 @@ function foreshadowJumpTo(id, kind, mentionIdx) {
   entry.positions.forEach(pos => {
     if (!byCh[pos.chId]) byCh[pos.chId] = pos;
   });
+  const classified = classifyForeshadowChapters(f, fsIndex);
   let target = null;
   if (kind === 'first') {
     target = byCh[entry.chapters[0]];
-  } else if (kind === 'last') {
-    target = byCh[entry.chapters[entry.chapters.length - 1]];
+  } else if (kind === 'harvest') {
+    target = byCh[classified.harvested];
   } else if (kind === 'mention' && typeof mentionIdx === 'number') {
-    // 중간 언급 = 첫 화·마지막 화 제외 (회수완료일 때만 마지막 제외)
-    const middle = f.status === '회수완료' && entry.chapters.length >= 2
-      ? entry.chapters.slice(1, -1)
-      : entry.chapters.slice(1);
-    const cid = middle[mentionIdx];
+    const cid = classified.mentioned[mentionIdx];
     if (cid) target = byCh[cid];
   }
   if (!target) { toast('위치를 찾을 수 없어요.'); return; }
@@ -1501,8 +1494,11 @@ function showForeshadowModal(id) {
       </div>
       <div><label class="label">뿌린 화/장면 <span style="font-size:10px;color:var(--muted)">(수동 입력)</span></label>
         <input id="fs-plant" value="${esc(fData.plant||'')}" placeholder="예: 3화, 1부 2장"></div>
-      <div><label class="label">회수 화/장면 <span style="font-size:10px;color:var(--muted)">(수동 입력)</span></label>
+      <div><label class="label">회수 위치 메모 <span style="font-size:10px;color:var(--muted)">(태그가 없는 경우에도 입력 가능)</span></label>
         <input id="fs-harvest" value="${esc(fData.harvest||'')}" placeholder="예: 15화"></div>
+      <div class="full"><label class="label">본문에서 회수할 화 <span style="font-size:10px;color:var(--muted)">(직접 지정)</span></label>
+        <select id="fs-harvest-chapter"></select>
+        <div id="fs-harvest-hint" style="font-size:11px;color:var(--muted);margin-top:4px"></div></div>
       <div><label class="label">상태</label>
         <select id="fs-status">${STATUS.map(s=>`<option value="${s}" ${(fData.status||'미회수')===s?'selected':''}>${s}</option>`).join('')}</select></div>
       <div><label class="label">중요도</label>
@@ -1527,6 +1523,7 @@ function showForeshadowModal(id) {
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
       <button class="btn btn-gold" onclick="saveForeshadow('${idEsc}')">저장</button>
     </div>`);
+  updateForeshadowHarvestOptions(fsIndex, fData.tagName, fData.harvestChapterId);
   setTimeout(()=>document.getElementById('fs-content')?.focus(),100);
 
   // 태그 이름 입력 시 실시간 상태 표시
@@ -1535,6 +1532,7 @@ function showForeshadowModal(id) {
   if (tagIn && statusEl) {
     tagIn.addEventListener('input', () => {
       const name = tagIn.value.trim();
+      updateForeshadowHarvestOptions(fsIndex, name, document.getElementById('fs-harvest-chapter')?.value);
       if (!name) { statusEl.innerHTML = ''; return; }
       const entry = fsIndex.byName[name];
       if (!entry || entry.chapters.length === 0) {
@@ -1546,6 +1544,22 @@ function showForeshadowModal(id) {
       }
     });
   }
+}
+
+function updateForeshadowHarvestOptions(index, tagName, selectedId) {
+  const select = document.getElementById('fs-harvest-chapter');
+  const hint = document.getElementById('fs-harvest-hint');
+  if (!select) return;
+  const chapterIds = index.byName[(tagName || '').trim()]?.chapters || [];
+  const current = selectedId || '';
+  select.innerHTML = '<option value="">— 회수 화 미지정 —</option>'
+    + (current && !chapterIds.includes(current)
+      ? `<option value="${esc(current)}">기존 지정 화 (현재 태그 없음)</option>` : '')
+    + chapterIds.map(id => `<option value="${esc(id)}">${esc(chapterLabel(id))}</option>`).join('');
+  select.value = current;
+  if (hint) hint.textContent = chapterIds.length
+    ? '본문에 이 복선 태그가 있는 화만 선택할 수 있습니다. 회수완료 상태에서 회수 위치로 표시됩니다.'
+    : '본문에 복선 태그를 넣으면 회수 화를 선택할 수 있습니다.';
 }
 
 function saveForeshadow(id) {
@@ -1565,6 +1579,7 @@ function saveForeshadow(id) {
     id: isEdit ? p.foreshadows[existingIdx].id : uid(),
     content,
     tagName,
+    harvestChapterId: document.getElementById('fs-harvest-chapter')?.value || '',
     plant:      document.getElementById('fs-plant').value,
     harvest:    document.getElementById('fs-harvest').value,
     status:     document.getElementById('fs-status').value,

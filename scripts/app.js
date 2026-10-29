@@ -1663,7 +1663,7 @@ function renderHome() {
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
         <p style="font-size:11px;color:var(--muted);opacity:.6;line-height:1.8">
-          호필 스튜디오 v0.6.21 beta · © 2026 호백<br>
+          호필 스튜디오 v0.6.22 beta · © 2026 호백<br>
           <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
             style="color:var(--muted);text-decoration:none;opacity:.8">CC BY-NC 4.0</a>
           · 비상업적 목적에 한해 자유롭게 사용 가능<br>
@@ -3405,6 +3405,7 @@ function renderEditorContent(ch) {
           <button class="btn btn-outline btn-sm" onclick="toggleSplitPanel()" id="split-toggle-btn" title="참고 패널" style="font-size:12px">⊞ 참고</button>
           <button class="btn btn-outline btn-sm typewriter-toggle" onclick="toggleTypewriterScrolling()" aria-pressed="false" title="입력 중인 줄을 화면 가운데에 유지" style="font-size:12px">⌖ 타자기 스크롤</button>
           <button class="btn btn-outline btn-sm" onclick="enterFocusMode()" title="집중 모드" style="font-size:13px">⛶ 집중</button>
+          <button class="btn btn-outline btn-sm" onclick="showChExportMenu('${ch.id}')" title="이 화 내보내기" style="font-size:12px">📤 내보내기</button>
           <details class="editor-more">
             <summary class="btn btn-outline btn-sm" aria-label="추가 집필 도구">⋯ 도구</summary>
             <div class="editor-more-actions">
@@ -5739,7 +5740,10 @@ function renderManuscript() {
 
   document.getElementById('main').innerHTML = `
     <div style="max-width:900px;margin:0 auto">
-      <div class="font-display" style="font-size:22px;margin-bottom:22px">원고 설정</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:22px">
+        <div class="font-display" style="font-size:22px">원고 설정</div>
+        <button class="btn btn-gold" onclick="showExportModal()">📤 원고 내보내기</button>
+      </div>
 
       <!-- 플랫폼 프리셋 -->
       <div class="card" style="margin-bottom:16px">
@@ -5840,7 +5844,7 @@ function updateMsPreview() {
   const wrap = document.getElementById('ms-preview-wrap');
   if (!wrap) return;
 
-  const text = ch ? (ch.content || '(내용 없음)') : '(화를 먼저 추가하세요)';
+  const text = ch ? (manuscriptExportText(ch.content) || '(내용 없음)') : '(화를 먼저 추가하세요)';
   const title = ch ? ch.title : '';
   // 첫 500자만 미리보기
   const preview = text.length > 500 ? text.slice(0, 500) + '…' : text;
@@ -5868,6 +5872,11 @@ function updateMsPreview() {
 // 내보내기 기능
 // ═══════════════════════════════════════════════════════════
 
+// 집필용 복선 표시는 원고 출력에서만 제외한다. 저장된 본문과 JSON 백업은 유지한다.
+function manuscriptExportText(content) {
+  return String(content || '').replace(/\[\[복선:([^\]\n]+?)\]\]/g, '');
+}
+
 // 클립보드 복사 (화 선택 or 전체)
 function copyToClipboard(chId) {
   const p = getProject();
@@ -5875,9 +5884,9 @@ function copyToClipboard(chId) {
   if (chId) {
     const ch = (p.chapters||[]).find(c => c.id === chId);
     if (!ch) return;
-    text = ch.title + '\n\n' + (ch.content||'');
+    text = ch.title + '\n\n' + manuscriptExportText(ch.content);
   } else {
-    text = (p.chapters||[]).map(c => c.title + '\n\n' + (c.content||'')).join('\n\n' + '─'.repeat(20) + '\n\n');
+    text = (p.chapters||[]).map(c => c.title + '\n\n' + manuscriptExportText(c.content)).join('\n\n' + '─'.repeat(20) + '\n\n');
   }
   navigator.clipboard.writeText(text).then(() => {
     toast('클립보드에 복사됐어요! 📋');
@@ -5900,10 +5909,10 @@ function exportTxt(chId) {
   if (chId) {
     const ch = (p.chapters||[]).find(c => c.id === chId);
     if (!ch) return;
-    text = ch.title + '\n\n' + (ch.content||'');
+    text = ch.title + '\n\n' + manuscriptExportText(ch.content);
     filename = (p.title||'작품') + '_' + ch.title + '.txt';
   } else {
-    text = (p.chapters||[]).map(c => c.title + '\n\n' + (c.content||'')).join('\n\n' + '─'.repeat(30) + '\n\n');
+    text = (p.chapters||[]).map(c => c.title + '\n\n' + manuscriptExportText(c.content)).join('\n\n' + '─'.repeat(30) + '\n\n');
     filename = (p.title||'작품') + '_전체.txt';
   }
   const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
@@ -5930,7 +5939,7 @@ function exportDocx(chId) {
 
   // Word XML 생성
   const paragraphs = chapters.map(ch => {
-    const lines = (ch.content||'').split('\n');
+    const lines = manuscriptExportText(ch.content).split('\n');
     const titleXml = `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>${escXml(ch.title)}</w:t></w:r></w:p>`;
     const contentXml = lines.map(line =>
       `<w:p><w:r><w:rPr><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr><w:t xml:space="preserve">${escXml(line)}</w:t></w:r></w:p>`
@@ -6015,6 +6024,9 @@ function showExportModal() {
       </select>
     </div>
     <div style="display:grid;gap:10px;margin-bottom:20px">
+      <button class="btn btn-gold" onclick="exportHwpx(document.getElementById('exp-ch').value)" style="justify-content:center;font-size:14px;padding:12px">
+        📖 한글 파일 (HWPX) 저장
+      </button>
       <button class="btn btn-gold" onclick="copyToClipboard(document.getElementById('exp-ch').value)" style="justify-content:center;font-size:14px;padding:12px">
         📋 클립보드 복사 (플랫폼 붙여넣기용)
       </button>
@@ -6023,9 +6035,6 @@ function showExportModal() {
       </button>
       <button class="btn btn-outline" onclick="exportDocx(document.getElementById('exp-ch').value)" style="justify-content:center;font-size:14px;padding:12px">
         📝 DOCX (Word) 파일로 저장
-      </button>
-      <button class="btn btn-outline" onclick="exportHwpx(document.getElementById('exp-ch').value)" style="justify-content:center;font-size:14px;padding:12px">
-        📖 HWPX (한글·화면 양식 적용) 저장
       </button>
       <button class="btn btn-outline" onclick="exportData()" style="justify-content:center;font-size:14px;padding:12px;border-color:var(--teal);color:var(--teal)">
         💾 JSON 백업 저장 (전체 데이터)
@@ -6036,6 +6045,7 @@ function showExportModal() {
       💡 <b>TXT</b>: 메모장·기타 도구에서 열기<br>
       💡 <b>DOCX</b>: MS Word·한컴오피스에서 열기<br>
       💡 <b>HWPX</b>: 현재 화면 양식의 글꼴·크기·행간·본문색·용지색을 한글 문서에 적용<br>
+      💡 원고 복사·내보내기에서는 집필용 <code>[[복선:이름]]</code> 태그가 제외됩니다. JSON 백업에는 남습니다.<br>
       💡 <b>JSON</b>: 앱 데이터 전체 백업 (캐릭터·플롯 포함)
     </div>
     <div class="modal-footer">
@@ -6052,6 +6062,9 @@ function showChExportMenu(chId) {
   showModal(`
     <div class="modal-title">📤 ${esc(ch.title)} 내보내기</div>
     <div style="display:grid;gap:10px;margin-bottom:20px">
+      <button class="btn btn-gold" onclick="exportHwpx('${chId}');closeModal()" style="justify-content:center;font-size:14px;padding:12px">
+        📖 한글 파일 (HWPX) 저장
+      </button>
       <button class="btn btn-gold" onclick="copyToClipboard('${chId}');closeModal()" style="justify-content:center;font-size:14px;padding:12px">
         📋 클립보드 복사
       </button>
@@ -6060,9 +6073,6 @@ function showChExportMenu(chId) {
       </button>
       <button class="btn btn-outline" onclick="exportDocx('${chId}');closeModal()" style="justify-content:center;font-size:14px;padding:12px">
         📝 DOCX 저장
-      </button>
-      <button class="btn btn-outline" onclick="exportHwpx('${chId}');closeModal()" style="justify-content:center;font-size:14px;padding:12px">
-        📖 HWPX (화면 양식 적용) 저장
       </button>
     </div>
     <div class="modal-footer">
@@ -8812,8 +8822,7 @@ function buildForeshadowIndex() {
 }
 
 // 해당 복선의 심기/회수/언급 화 분류.
-// 심기 = 첫 등장 화, 회수 = 마지막 등장 화 (복선 status=='회수완료'일 때만),
-// 언급 = 그 사이 중간 등장 화들.
+// 심기는 첫 등장 화, 회수는 작가가 지정한 태그 등장 화만 사용한다.
 function classifyForeshadowChapters(foreshadow, index) {
   const tagName = (foreshadow?.tagName || '').trim();
   if (!tagName) return { planted: null, harvested: null, mentioned: [], linked: false, tagName: '' };
@@ -8823,12 +8832,9 @@ function classifyForeshadowChapters(foreshadow, index) {
   }
   const chIds = entry.chapters;
   const planted = chIds[0];
-  let harvested = null;
-  let mentioned = chIds.slice(1);
-  if (foreshadow.status === '회수완료' && chIds.length >= 2) {
-    harvested = chIds[chIds.length - 1];
-    mentioned = chIds.slice(1, -1);
-  }
+  const selectedHarvest = foreshadow.status === '회수완료' ? foreshadow.harvestChapterId : null;
+  const harvested = selectedHarvest && chIds.includes(selectedHarvest) ? selectedHarvest : null;
+  const mentioned = chIds.slice(1).filter(id => id !== harvested);
   return { planted, harvested, mentioned, linked: true, tagName };
 }
 
@@ -9189,8 +9195,8 @@ function renderForeshadow() {
           const mentionCount = cls.linked ? cls.mentioned.length : 0;
           // 자동 vs 수동 우선 표시 결정
           const showPlant = autoPlant || f.plant || '';
-          const showHarvest = autoHarvest || f.harvest || (st==='미회수'?'미회수':'');
-          const hasRow = cls.linked || f.plant || f.harvest;
+          const showHarvest = autoHarvest || f.harvest || (st==='미회수'?'미회수':'회수 화 미지정');
+          const hasRow = cls.linked || f.plant || f.harvest || st==='회수완료';
           return `
           <div class="card" style="margin-bottom:12px;border-left:4px solid ${STATUS_COLOR[st]}">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
@@ -9224,7 +9230,7 @@ function renderForeshadow() {
                   }
                   <span style="color:var(--border);font-size:16px">→→→</span>
                   ${autoHarvest
-                    ? `<button onclick="foreshadowJumpTo('${fsIdEsc}', 'last')" style="background:none;border:none;cursor:pointer;padding:0;font-weight:600;color:var(--teal);font-family:'Noto Sans KR',sans-serif;text-decoration:underline;text-decoration-color:rgba(20,140,120,.3);text-underline-offset:3px">${esc(autoHarvest)}</button>`
+                    ? `<button onclick="foreshadowJumpTo('${fsIdEsc}', 'harvest')" style="background:none;border:none;cursor:pointer;padding:0;font-weight:600;color:var(--teal);font-family:'Noto Sans KR',sans-serif;text-decoration:underline;text-decoration-color:rgba(20,140,120,.3);text-underline-offset:3px">${esc(autoHarvest)}</button>`
                     : `<span style="font-weight:600;color:${st==='회수완료'?'var(--teal)':'var(--ink)'}">${esc(showHarvest||'?')}</span>`
                   }
                   ${st==='회수완료'?'<span style="color:var(--teal)">✅</span>':''}
@@ -9257,7 +9263,7 @@ function renderForeshadow() {
 }
 
 // 복선 카드 → 본문의 해당 태그 위치로 이동
-// kind: 'first' = 첫 등장(심기), 'last' = 마지막 등장(회수), 'mention' = 중간 언급 n번째
+// kind: 'first' = 첫 등장(심기), 'harvest' = 지정된 회수, 'mention' = 중간 언급 n번째
 function foreshadowJumpTo(id, kind, mentionIdx) {
   const p = getProject();
   const f = p?.foreshadows?.find(x => x.id === id);
@@ -9273,17 +9279,14 @@ function foreshadowJumpTo(id, kind, mentionIdx) {
   entry.positions.forEach(pos => {
     if (!byCh[pos.chId]) byCh[pos.chId] = pos;
   });
+  const classified = classifyForeshadowChapters(f, fsIndex);
   let target = null;
   if (kind === 'first') {
     target = byCh[entry.chapters[0]];
-  } else if (kind === 'last') {
-    target = byCh[entry.chapters[entry.chapters.length - 1]];
+  } else if (kind === 'harvest') {
+    target = byCh[classified.harvested];
   } else if (kind === 'mention' && typeof mentionIdx === 'number') {
-    // 중간 언급 = 첫 화·마지막 화 제외 (회수완료일 때만 마지막 제외)
-    const middle = f.status === '회수완료' && entry.chapters.length >= 2
-      ? entry.chapters.slice(1, -1)
-      : entry.chapters.slice(1);
-    const cid = middle[mentionIdx];
+    const cid = classified.mentioned[mentionIdx];
     if (cid) target = byCh[cid];
   }
   if (!target) { toast('위치를 찾을 수 없어요.'); return; }
@@ -9353,8 +9356,11 @@ function showForeshadowModal(id) {
       </div>
       <div><label class="label">뿌린 화/장면 <span style="font-size:10px;color:var(--muted)">(수동 입력)</span></label>
         <input id="fs-plant" value="${esc(fData.plant||'')}" placeholder="예: 3화, 1부 2장"></div>
-      <div><label class="label">회수 화/장면 <span style="font-size:10px;color:var(--muted)">(수동 입력)</span></label>
+      <div><label class="label">회수 위치 메모 <span style="font-size:10px;color:var(--muted)">(태그가 없는 경우에도 입력 가능)</span></label>
         <input id="fs-harvest" value="${esc(fData.harvest||'')}" placeholder="예: 15화"></div>
+      <div class="full"><label class="label">본문에서 회수할 화 <span style="font-size:10px;color:var(--muted)">(직접 지정)</span></label>
+        <select id="fs-harvest-chapter"></select>
+        <div id="fs-harvest-hint" style="font-size:11px;color:var(--muted);margin-top:4px"></div></div>
       <div><label class="label">상태</label>
         <select id="fs-status">${STATUS.map(s=>`<option value="${s}" ${(fData.status||'미회수')===s?'selected':''}>${s}</option>`).join('')}</select></div>
       <div><label class="label">중요도</label>
@@ -9379,6 +9385,7 @@ function showForeshadowModal(id) {
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
       <button class="btn btn-gold" onclick="saveForeshadow('${idEsc}')">저장</button>
     </div>`);
+  updateForeshadowHarvestOptions(fsIndex, fData.tagName, fData.harvestChapterId);
   setTimeout(()=>document.getElementById('fs-content')?.focus(),100);
 
   // 태그 이름 입력 시 실시간 상태 표시
@@ -9387,6 +9394,7 @@ function showForeshadowModal(id) {
   if (tagIn && statusEl) {
     tagIn.addEventListener('input', () => {
       const name = tagIn.value.trim();
+      updateForeshadowHarvestOptions(fsIndex, name, document.getElementById('fs-harvest-chapter')?.value);
       if (!name) { statusEl.innerHTML = ''; return; }
       const entry = fsIndex.byName[name];
       if (!entry || entry.chapters.length === 0) {
@@ -9398,6 +9406,22 @@ function showForeshadowModal(id) {
       }
     });
   }
+}
+
+function updateForeshadowHarvestOptions(index, tagName, selectedId) {
+  const select = document.getElementById('fs-harvest-chapter');
+  const hint = document.getElementById('fs-harvest-hint');
+  if (!select) return;
+  const chapterIds = index.byName[(tagName || '').trim()]?.chapters || [];
+  const current = selectedId || '';
+  select.innerHTML = '<option value="">— 회수 화 미지정 —</option>'
+    + (current && !chapterIds.includes(current)
+      ? `<option value="${esc(current)}">기존 지정 화 (현재 태그 없음)</option>` : '')
+    + chapterIds.map(id => `<option value="${esc(id)}">${esc(chapterLabel(id))}</option>`).join('');
+  select.value = current;
+  if (hint) hint.textContent = chapterIds.length
+    ? '본문에 이 복선 태그가 있는 화만 선택할 수 있습니다. 회수완료 상태에서 회수 위치로 표시됩니다.'
+    : '본문에 복선 태그를 넣으면 회수 화를 선택할 수 있습니다.';
 }
 
 function saveForeshadow(id) {
@@ -9417,6 +9441,7 @@ function saveForeshadow(id) {
     id: isEdit ? p.foreshadows[existingIdx].id : uid(),
     content,
     tagName,
+    harvestChapterId: document.getElementById('fs-harvest-chapter')?.value || '',
     plant:      document.getElementById('fs-plant').value,
     harvest:    document.getElementById('fs-harvest').value,
     status:     document.getElementById('fs-status').value,
@@ -11937,7 +11962,7 @@ function hwpxPrepareFiles(template, project, chapters) {
   for (const chapter of chapters) {
     addPara('', false);
     addPara(chapter.title || '제목 없음', true);
-    for (const line of String(chapter.content || '').split(/\r\n|\n|\r/)) addPara(line, false);
+    for (const line of manuscriptExportText(chapter.content).split(/\r\n|\n|\r/)) addPara(line, false);
   }
   files['Contents/section0.xml'] = new XMLSerializer().serializeToString(section);
 

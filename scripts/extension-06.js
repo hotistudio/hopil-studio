@@ -68,7 +68,7 @@
 
     const parts = targets.map(ch => {
       const title = ch.title || '제목 없음';
-      const body = convertText(ch.content || '', rule);
+      const body = convertText(manuscriptExportText(ch.content), rule);
       if (scope === 'all') {
         // 화 사이에 제목 헤더 삽입
         return `[${title}]\n\n${body}`;

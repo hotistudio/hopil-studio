@@ -133,7 +133,7 @@ function hwpxPrepareFiles(template, project, chapters) {
   for (const chapter of chapters) {
     addPara('', false);
     addPara(chapter.title || '제목 없음', true);
-    for (const line of String(chapter.content || '').split(/\r\n|\n|\r/)) addPara(line, false);
+    for (const line of manuscriptExportText(chapter.content).split(/\r\n|\n|\r/)) addPara(line, false);
   }
   files['Contents/section0.xml'] = new XMLSerializer().serializeToString(section);
 

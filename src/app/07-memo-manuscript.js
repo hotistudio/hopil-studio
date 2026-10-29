@@ -442,7 +442,10 @@ function renderManuscript() {
 
   document.getElementById('main').innerHTML = `
     <div style="max-width:900px;margin:0 auto">
-      <div class="font-display" style="font-size:22px;margin-bottom:22px">원고 설정</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:22px">
+        <div class="font-display" style="font-size:22px">원고 설정</div>
+        <button class="btn btn-gold" onclick="showExportModal()">📤 원고 내보내기</button>
+      </div>
 
       <!-- 플랫폼 프리셋 -->
       <div class="card" style="margin-bottom:16px">
@@ -543,7 +546,7 @@ function updateMsPreview() {
   const wrap = document.getElementById('ms-preview-wrap');
   if (!wrap) return;
 
-  const text = ch ? (ch.content || '(내용 없음)') : '(화를 먼저 추가하세요)';
+  const text = ch ? (manuscriptExportText(ch.content) || '(내용 없음)') : '(화를 먼저 추가하세요)';
   const title = ch ? ch.title : '';
   // 첫 500자만 미리보기
   const preview = text.length > 500 ? text.slice(0, 500) + '…' : text;
@@ -571,6 +574,11 @@ function updateMsPreview() {
 // 내보내기 기능
 // ═══════════════════════════════════════════════════════════
 
+// 집필용 복선 표시는 원고 출력에서만 제외한다. 저장된 본문과 JSON 백업은 유지한다.
+function manuscriptExportText(content) {
+  return String(content || '').replace(/\[\[복선:([^\]\n]+?)\]\]/g, '');
+}
+
 // 클립보드 복사 (화 선택 or 전체)
 function copyToClipboard(chId) {
   const p = getProject();
@@ -578,9 +586,9 @@ function copyToClipboard(chId) {
   if (chId) {
     const ch = (p.chapters||[]).find(c => c.id === chId);
     if (!ch) return;
-    text = ch.title + '\n\n' + (ch.content||'');
+    text = ch.title + '\n\n' + manuscriptExportText(ch.content);
   } else {
-    text = (p.chapters||[]).map(c => c.title + '\n\n' + (c.content||'')).join('\n\n' + '─'.repeat(20) + '\n\n');
+    text = (p.chapters||[]).map(c => c.title + '\n\n' + manuscriptExportText(c.content)).join('\n\n' + '─'.repeat(20) + '\n\n');
   }
   navigator.clipboard.writeText(text).then(() => {
     toast('클립보드에 복사됐어요! 📋');
@@ -603,10 +611,10 @@ function exportTxt(chId) {
   if (chId) {
     const ch = (p.chapters||[]).find(c => c.id === chId);
     if (!ch) return;
-    text = ch.title + '\n\n' + (ch.content||'');
+    text = ch.title + '\n\n' + manuscriptExportText(ch.content);
     filename = (p.title||'작품') + '_' + ch.title + '.txt';
   } else {
-    text = (p.chapters||[]).map(c => c.title + '\n\n' + (c.content||'')).join('\n\n' + '─'.repeat(30) + '\n\n');
+    text = (p.chapters||[]).map(c => c.title + '\n\n' + manuscriptExportText(c.content)).join('\n\n' + '─'.repeat(30) + '\n\n');
     filename = (p.title||'작품') + '_전체.txt';
   }
   const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
@@ -633,7 +641,7 @@ function exportDocx(chId) {
 
   // Word XML 생성
   const paragraphs = chapters.map(ch => {
-    const lines = (ch.content||'').split('\n');
+    const lines = manuscriptExportText(ch.content).split('\n');
     const titleXml = `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>${escXml(ch.title)}</w:t></w:r></w:p>`;
     const contentXml = lines.map(line =>
       `<w:p><w:r><w:rPr><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr><w:t xml:space="preserve">${escXml(line)}</w:t></w:r></w:p>`
@@ -718,6 +726,9 @@ function showExportModal() {
       </select>
     </div>
     <div style="display:grid;gap:10px;margin-bottom:20px">
+      <button class="btn btn-gold" onclick="exportHwpx(document.getElementById('exp-ch').value)" style="justify-content:center;font-size:14px;padding:12px">
+        📖 한글 파일 (HWPX) 저장
+      </button>
       <button class="btn btn-gold" onclick="copyToClipboard(document.getElementById('exp-ch').value)" style="justify-content:center;font-size:14px;padding:12px">
         📋 클립보드 복사 (플랫폼 붙여넣기용)
       </button>
@@ -726,9 +737,6 @@ function showExportModal() {
       </button>
       <button class="btn btn-outline" onclick="exportDocx(document.getElementById('exp-ch').value)" style="justify-content:center;font-size:14px;padding:12px">
         📝 DOCX (Word) 파일로 저장
-      </button>
-      <button class="btn btn-outline" onclick="exportHwpx(document.getElementById('exp-ch').value)" style="justify-content:center;font-size:14px;padding:12px">
-        📖 HWPX (한글·화면 양식 적용) 저장
       </button>
       <button class="btn btn-outline" onclick="exportData()" style="justify-content:center;font-size:14px;padding:12px;border-color:var(--teal);color:var(--teal)">
         💾 JSON 백업 저장 (전체 데이터)
@@ -739,6 +747,7 @@ function showExportModal() {
       💡 <b>TXT</b>: 메모장·기타 도구에서 열기<br>
       💡 <b>DOCX</b>: MS Word·한컴오피스에서 열기<br>
       💡 <b>HWPX</b>: 현재 화면 양식의 글꼴·크기·행간·본문색·용지색을 한글 문서에 적용<br>
+      💡 원고 복사·내보내기에서는 집필용 <code>[[복선:이름]]</code> 태그가 제외됩니다. JSON 백업에는 남습니다.<br>
       💡 <b>JSON</b>: 앱 데이터 전체 백업 (캐릭터·플롯 포함)
     </div>
     <div class="modal-footer">
@@ -755,6 +764,9 @@ function showChExportMenu(chId) {
   showModal(`
     <div class="modal-title">📤 ${esc(ch.title)} 내보내기</div>
     <div style="display:grid;gap:10px;margin-bottom:20px">
+      <button class="btn btn-gold" onclick="exportHwpx('${chId}');closeModal()" style="justify-content:center;font-size:14px;padding:12px">
+        📖 한글 파일 (HWPX) 저장
+      </button>
       <button class="btn btn-gold" onclick="copyToClipboard('${chId}');closeModal()" style="justify-content:center;font-size:14px;padding:12px">
         📋 클립보드 복사
       </button>
@@ -763,9 +775,6 @@ function showChExportMenu(chId) {
       </button>
       <button class="btn btn-outline" onclick="exportDocx('${chId}');closeModal()" style="justify-content:center;font-size:14px;padding:12px">
         📝 DOCX 저장
-      </button>
-      <button class="btn btn-outline" onclick="exportHwpx('${chId}');closeModal()" style="justify-content:center;font-size:14px;padding:12px">
-        📖 HWPX (화면 양식 적용) 저장
       </button>
     </div>
     <div class="modal-footer">
