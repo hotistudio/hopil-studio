@@ -384,6 +384,7 @@ html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacit
 .diagram-wrap{display:flex;flex-direction:column;height:calc(100vh - var(--header));overflow:hidden}
 .diagram-toolbar{padding:10px 16px;border-bottom:1px solid var(--border);background:var(--white);
   display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0}
+.diagram-help{flex:1;min-width:210px;font-size:10px;color:var(--muted);line-height:1.4}
 .diagram-canvas-wrap{flex:1;position:relative;overflow:hidden;background:var(--paper);
   background-image:radial-gradient(circle,#d9cfbb 1px,transparent 1px);
   background-size:24px 24px}
@@ -410,6 +411,7 @@ html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacit
   white-space:nowrap;font-family:'Noto Sans KR',sans-serif;transition:all .15s}
 .diagram-tab.active{background:var(--gold);color:#fff;border-color:var(--gold)}
 .diagram-tab:hover:not(.active){background:var(--cream);border-color:var(--gold)}
+#btn-edit-node:disabled{opacity:.45;cursor:default}
 
 /* ═══ FAMILY TREE ═══════════════════════════════════════════════ */
 .ft-node{position:absolute;background:var(--white);border:2px solid var(--border);

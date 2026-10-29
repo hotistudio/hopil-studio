@@ -4355,6 +4355,31 @@ function screenToLogic(sx, sy) {
   };
 }
 
+function findDiagramEdgeAt(clientX, clientY, maxScreenDistance) {
+  const diagram = getActiveDiagram();
+  if (!diagram?.edges?.length) return -1;
+  const point = screenToLogic(clientX, clientY);
+  let closest = -1;
+  let closestDistance = maxScreenDistance / dgState.zoom;
+  (diagram.edges || []).forEach((edge, index) => {
+    const from = (diagram.nodes || []).find(node => node.id === edge.from);
+    const to = (diagram.nodes || []).find(node => node.id === edge.to);
+    if (!from || !to) return;
+    const fromEl = document.getElementById('node-' + from.id);
+    const toEl = document.getElementById('node-' + to.id);
+    const x1 = from.x + (fromEl?.offsetWidth || 180) / 2;
+    const y1 = from.y + (fromEl?.offsetHeight || 76) / 2;
+    const x2 = to.x + (toEl?.offsetWidth || 180) / 2;
+    const y2 = to.y + (toEl?.offsetHeight || 76) / 2;
+    const dx = x2 - x1, dy = y2 - y1;
+    const lengthSquared = dx * dx + dy * dy;
+    const t = lengthSquared ? Math.max(0, Math.min(1, ((point.x - x1) * dx + (point.y - y1) * dy) / lengthSquared)) : 0;
+    const distance = Math.hypot(point.x - (x1 + t * dx), point.y - (y1 + t * dy));
+    if (distance < closestDistance) { closestDistance = distance; closest = index; }
+  });
+  return closest;
+}
+
 // 논리 좌표 → 화면 좌표 (wrap 기준)
 function logicToScreen(lx, ly) {
   return {
@@ -4411,10 +4436,11 @@ function renderDiagram() {
         <div style="width:1px;height:20px;background:var(--border)"></div>
         <button class="btn btn-outline btn-sm" onclick="showAddNodeModal()">＋ 노드 추가</button>
         <button class="btn btn-outline btn-sm" onclick="toggleConnectMode()" id="btn-connect">🔗 연결</button>
+        <button class="btn btn-outline btn-sm" onclick="editSelectedDiagramNode()" id="btn-edit-node" disabled>선택한 노드 편집</button>
         <button class="btn btn-outline btn-sm" onclick="resetView()">⊕ 화면 맞춤</button>
         <span id="zoom-label" style="font-size:11px;color:var(--muted);min-width:36px;text-align:center">100%</span>
         <button class="btn btn-outline btn-sm" onclick="clearSelection()">✕ 선택 해제</button>
-        <div style="flex:1"></div>
+        <span class="diagram-help">빈 공간 끌기: 이동 · 휠/두 손가락: 확대 · 노드 선택/선 터치: 편집</span>
         <button class="btn btn-danger btn-sm" onclick="deleteActiveDiagram()">다이어그램 삭제</button>
         `:''}
       </div>
@@ -4437,6 +4463,7 @@ function renderDiagram() {
     dgState.zoom = 1;
     renderDiagramCanvas();
     setupDiagramEvents();
+    requestAnimationFrame(resetView);
   }
 }
 
@@ -4482,6 +4509,7 @@ function renderDiagramCanvas() {
     `;
     canvas.appendChild(el);
   });
+  updateDiagramSelectionToolbar();
 
   // ── 엣지(연결선) 렌더 ────────────────────────────────────────
   const EDGE_COLORS = ['#235f62','#c4922a','#b5451b','#3949ab','#7b1fa2','#555555'];
@@ -4676,6 +4704,7 @@ function setupDiagramEvents() {
 
     moved = false;
     dgState.selectedNodeId = id;
+    updateDiagramSelectionToolbar();
 
     // 롱프레스 (800ms) → 컨텍스트 메뉴
     longTimer = setTimeout(() => {
@@ -4688,7 +4717,7 @@ function setupDiagramEvents() {
     // 드래그 준비
     const lpos = screenToLogic(x, y);
     // node0.x/y는 이미 논리좌표 → offset도 논리좌표 기준
-    drag = { id, offX: lpos.x - (node0?.x ?? lpos.x), offY: lpos.y - (node0?.y ?? lpos.y) };
+    drag = { id, startX:x, startY:y, offX: lpos.x - (node0?.x ?? lpos.x), offY: lpos.y - (node0?.y ?? lpos.y) };
     nodeEl.style.zIndex = 100;
     e.preventDefault();
   }
@@ -4697,6 +4726,7 @@ function setupDiagramEvents() {
   function nodeMove(e) {
     if (!drag) return;
     const {x, y} = xy(e);
+    if (!moved && Math.hypot(x - drag.startX, y - drag.startY) < 6) return;
     moved = true;
     clearTimeout(longTimer);
     const dgEnd  = getActiveDiagram();
@@ -4745,6 +4775,7 @@ function setupDiagramEvents() {
 
   // ── 캔버스 이벤트 등록 ───────────────────────────────────────
   canvas.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
     const nodeEl = e.target.closest('.dg-node');
     if (nodeEl) nodeStart(e, nodeEl);
     else { dgState.selectedNodeId = null; renderDiagramCanvas(); }
@@ -4771,6 +4802,36 @@ function setupDiagramEvents() {
   // ── 핀치 줌 + 두 손가락 패닝 ────────────────────────────────
   const wrapEl = document.getElementById('dg-wrap');
   if (wrapEl) {
+    let mousePan = null;
+    let touchPan = null;
+    wrapEl.addEventListener('mousedown', e => {
+      if (e.button !== 0 || e.target.closest('.dg-node')) return;
+      mousePan = {x:e.clientX, y:e.clientY};
+      wrapEl.style.cursor = 'grabbing';
+    });
+    window.addEventListener('mousemove', e => {
+      if (!mousePan) return;
+      dgState.pan.x += e.clientX - mousePan.x;
+      dgState.pan.y += e.clientY - mousePan.y;
+      mousePan = {x:e.clientX, y:e.clientY};
+      applyStage();
+    });
+    window.addEventListener('mouseup', () => {
+      mousePan = null;
+      wrapEl.style.cursor = '';
+    });
+    wrapEl.addEventListener('wheel', e => {
+      e.preventDefault();
+      const rect = wrapEl.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const nextZoom = Math.max(0.3, Math.min(3, dgState.zoom * (1 - e.deltaY * 0.001)));
+      const ratio = nextZoom / dgState.zoom;
+      dgState.pan.x = x - (x - dgState.pan.x) * ratio;
+      dgState.pan.y = y - (y - dgState.pan.y) * ratio;
+      dgState.zoom = nextZoom;
+      applyStage();
+    }, {passive:false});
     let lastDist  = null;
     let lastMidX  = null, lastMidY  = null;
     let isPinching = false;
@@ -4791,10 +4852,14 @@ function setupDiagramEvents() {
       if (e.touches.length === 2) {
         isPinching = true;
         drag = null; // 드래그 취소
+        touchPan = null;
+        clearTimeout(longTimer);
         lastDist = getTouchDist(e);
         const mid = getTouchMid(e);
         lastMidX = mid.x; lastMidY = mid.y;
         e.preventDefault();
+      } else if (e.touches.length === 1 && !e.target.closest('.dg-node')) {
+        touchPan = {x:e.touches[0].clientX, y:e.touches[0].clientY};
       }
     }, {passive: false});
 
@@ -4823,27 +4888,38 @@ function setupDiagramEvents() {
         }
         lastDist = dist; lastMidX = mid.x; lastMidY = mid.y;
         applyStage();
+      } else if (e.touches.length === 1 && touchPan) {
+        e.preventDefault();
+        const x = e.touches[0].clientX;
+        const y = e.touches[0].clientY;
+        dgState.pan.x += x - touchPan.x;
+        dgState.pan.y += y - touchPan.y;
+        touchPan = {x, y};
+        applyStage();
       }
     }, {passive: false});
 
     wrapEl.addEventListener('touchend', e => {
+      if (e.touches.length === 0) touchPan = null;
       if (e.touches.length < 2) {
         isPinching = false;
         lastDist = null; lastMidX = null; lastMidY = null;
       }
     }, {passive: true});
+    wrapEl.addEventListener('touchcancel', () => { touchPan = null; }, {passive:true});
   }
 
   // ── 연결선 터치 — wrap 전체에서 감지 (SVG pointer-events 우회) ──
   const wrap = document.getElementById('dg-wrap');
   if (wrap) {
-    let edgeTimer = null;
+    let edgeIndex = -1;
     let edgeMoved = false;
     let edgeTouchX = 0, edgeTouchY = 0;
 
     wrap.addEventListener('touchstart', e => {
       // 노드 위면 무시 (노드 이벤트가 처리)
-      if (e.target.closest('.dg-node')) return;
+      edgeIndex = -1;
+      if (e.touches.length !== 1 || e.target.closest('.dg-node')) return;
       edgeMoved = false;
       edgeTouchX = e.touches[0].clientX;
       edgeTouchY = e.touches[0].clientY;
@@ -4851,78 +4927,29 @@ function setupDiagramEvents() {
       // 터치 좌표와 가장 가까운 엣지 찾기
       const dg = getActiveDiagram();
       if (!dg || !dg.edges || dg.edges.length === 0) return;
-      const wrapRect = wrap.getBoundingClientRect();
-      const tl = screenToLogic(edgeTouchX, edgeTouchY);
-      const tx = tl.x, ty = tl.y;
-
-      let closestIdx = -1;
-      let closestDist = 30; // 30px 이내만 감지
-      (dg.edges||[]).forEach((edge, ei) => {
-        const from = (dg.nodes||[]).find(n=>n.id===edge.from);
-        const to   = (dg.nodes||[]).find(n=>n.id===edge.to);
-        if (!from||!to) return;
-        const fx = from.x+dgState.pan.x+90, fy = from.y+dgState.pan.y+38;
-        const ex = to.x+dgState.pan.x+90,   ey = to.y+dgState.pan.y+38;
-        // 점-선분 거리 계산
-        const dx = ex-fx, dy = ey-fy;
-        const lenSq = dx*dx + dy*dy;
-        let t = lenSq > 0 ? ((tx-fx)*dx + (ty-fy)*dy) / lenSq : 0;
-        t = Math.max(0, Math.min(1, t));
-        const px = fx + t*dx - tx, py = fy + t*dy - ty;
-        const dist = Math.sqrt(px*px + py*py);
-        if (dist < closestDist) { closestDist = dist; closestIdx = ei; }
-      });
-
-      if (closestIdx < 0) return;
-
-      edgeTimer = setTimeout(() => {
-        if (!edgeMoved) {
-          navigator.vibrate?.(50);
-          // 선택 표시 먼저
-          dgState.selectedEdgeIdx = closestIdx;
-          renderDiagramCanvas();
-          showEditEdgeModal(closestIdx);
-        }
-      }, 800);
+      edgeIndex = findDiagramEdgeAt(edgeTouchX, edgeTouchY, 20);
     }, {passive: true});
 
     wrap.addEventListener('touchmove', e => {
+      if (e.touches.length !== 1) { edgeIndex = -1; return; }
       const dx = e.touches[0].clientX - edgeTouchX;
       const dy = e.touches[0].clientY - edgeTouchY;
-      if (Math.sqrt(dx*dx+dy*dy) > 8) { edgeMoved = true; clearTimeout(edgeTimer); }
+      if (Math.hypot(dx,dy) > 8) edgeMoved = true;
     }, {passive: true});
 
-    wrap.addEventListener('touchend',    () => clearTimeout(edgeTimer), {passive: true});
-    wrap.addEventListener('touchcancel', () => clearTimeout(edgeTimer), {passive: true});
+    wrap.addEventListener('touchend', e => {
+      if (e.touches.length === 0 && edgeIndex >= 0 && !edgeMoved) showEditEdgeModal(edgeIndex);
+      edgeIndex = -1;
+    }, {passive: true});
+    wrap.addEventListener('touchcancel', () => { edgeIndex = -1; }, {passive: true});
 
-    // PC 더블클릭으로 노드/선 편집
+    // 연결선은 더블클릭으로 편집한다. 노드는 두 번째 클릭에서 열리므로 중복 실행하지 않는다.
     wrap.addEventListener('dblclick', e => {
-      // 노드 더블클릭 → 편집 모달
       const nodeEl = e.target.closest('.dg-node');
-      if (nodeEl) {
-        const id = nodeEl.dataset.id;
-        if (id) { e.preventDefault(); showEditNodeModal(id); }
-        return;
-      }
+      if (nodeEl) return;
       const dg = getActiveDiagram();
       if (!dg || !dg.edges || dg.edges.length === 0) return;
-      const wrapRect = wrap.getBoundingClientRect();
-      const tl2 = screenToLogic(e.clientX, e.clientY);
-      const tx = tl2.x, ty = tl2.y;
-      let closestIdx = -1, closestDist = 20;
-      (dg.edges||[]).forEach((edge, ei) => {
-        const from = (dg.nodes||[]).find(n=>n.id===edge.from);
-        const to   = (dg.nodes||[]).find(n=>n.id===edge.to);
-        if (!from||!to) return;
-        const fx=from.x+dgState.pan.x+90, fy=from.y+dgState.pan.y+38;
-        const ex=to.x+dgState.pan.x+90,   ey=to.y+dgState.pan.y+38;
-        const dx=ex-fx, dy=ey-fy, lenSq=dx*dx+dy*dy;
-        let t = lenSq>0 ? ((tx-fx)*dx+(ty-fy)*dy)/lenSq : 0;
-        t = Math.max(0,Math.min(1,t));
-        const px=fx+t*dx-tx, py=fy+t*dy-ty;
-        const dist=Math.sqrt(px*px+py*py);
-        if (dist<closestDist) { closestDist=dist; closestIdx=ei; }
-      });
+      const closestIdx = findDiagramEdgeAt(e.clientX, e.clientY, 20);
       if (closestIdx >= 0) showEditEdgeModal(closestIdx);
     });
   }
@@ -4980,11 +5007,49 @@ function renderEdgesOnly() {
 
 
 function resetView() {
-  dgState.pan={x:0,y:0};
-  dgState.zoom=1;
-  renderDiagramCanvas();
+  const dg = getActiveDiagram();
+  const wrap = document.getElementById('dg-wrap');
+  if (!dg || !wrap) return;
+  const nodes = dg.nodes || [];
+  if (!nodes.length) {
+    dgState.pan = {x:0, y:0};
+    dgState.zoom = 1;
+    applyStage();
+    return;
+  }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodes.forEach(node => {
+    const el = document.getElementById('node-' + node.id);
+    const width = el?.offsetWidth || 180;
+    const height = el?.offsetHeight || 76;
+    minX = Math.min(minX, node.x);
+    minY = Math.min(minY, node.y);
+    maxX = Math.max(maxX, node.x + width);
+    maxY = Math.max(maxY, node.y + height);
+  });
+  const width = Math.max(1, maxX - minX);
+  const height = Math.max(1, maxY - minY);
+  const viewWidth = wrap.clientWidth || wrap.offsetWidth;
+  const viewHeight = wrap.clientHeight || wrap.offsetHeight;
+  if (!viewWidth || !viewHeight) return;
+  dgState.zoom = Math.max(0.3, Math.min(1, (viewWidth - 64) / width, (viewHeight - 64) / height));
+  dgState.pan = {
+    x: (viewWidth - width * dgState.zoom) / 2 - minX * dgState.zoom,
+    y: (viewHeight - height * dgState.zoom) / 2 - minY * dgState.zoom
+  };
+  applyStage();
 }
 function clearSelection() { dgState.selectedNodeId=null; renderDiagramCanvas(); }
+function updateDiagramSelectionToolbar() {
+  const button = document.getElementById('btn-edit-node');
+  if (!button) return;
+  const node = (getActiveDiagram()?.nodes || []).find(item => item.id === dgState.selectedNodeId);
+  button.disabled = !node;
+  button.textContent = node ? `${node.label} 편집` : '선택한 노드 편집';
+}
+function editSelectedDiagramNode() {
+  if (dgState.selectedNodeId) showEditNodeModal(dgState.selectedNodeId);
+}
 
 function toggleConnectMode(force) {
   dgState.connecting = force !== undefined ? force : !dgState.connecting;
@@ -5176,8 +5241,8 @@ function addNode() {
   const sub = document.getElementById('nd-sub').value.trim();
   const dg = getActiveDiagram();
   const wrap = document.getElementById('dg-wrap');
-  const cx = wrap ? wrap.offsetWidth/2 - dgState.pan.x - 90 : 200;
-  const cy = wrap ? wrap.offsetHeight/2 - dgState.pan.y - 30 : 150;
+  const cx = wrap ? (wrap.offsetWidth/2 - dgState.pan.x) / dgState.zoom - 90 : 200;
+  const cy = wrap ? (wrap.offsetHeight/2 - dgState.pan.y) / dgState.zoom - 30 : 150;
   if (!dg.nodes) dg.nodes = [];
   const color = document.querySelector('#nd-color-group button[data-selected]')?.dataset.val || '#f0e9d8';
   dg.nodes.push({ id:uid(), label, type, sub, color, x:cx + (Math.random()-0.5)*80, y:cy + (Math.random()-0.5)*80 });
