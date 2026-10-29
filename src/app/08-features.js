@@ -3191,13 +3191,15 @@ function renderPsyArc() {
 
   const cols = arcs.map((arc, ai) => {
     const steps = arc.steps || [];
-    const charColor = arc.charName ? getCharColor(arc.charName, p) : 'var(--gold)';
+    const character = getPsyArcCharacter(arc, p);
+    const charName = character?.name || arc.charName || '';
+    const charColor = charName ? (character?.color || 'var(--teal)') : 'var(--gold)';
     return `
       <div class="arc-col" style="min-width:240px;max-width:240px;border-top:3px solid ${charColor}">
         <div class="arc-col-header" style="flex-direction:column;align-items:flex-start;gap:6px">
           <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              ${arc.charName ? `<span style="background:${charColor};color:${getContrastColor(charColor)};border-radius:20px;padding:3px 12px;font-size:13px;font-weight:700">${esc(arc.charName)}</span>` : ''}
+              ${charName ? `<span style="background:${charColor};color:${getContrastColor(charColor)};border-radius:20px;padding:3px 12px;font-size:13px;font-weight:700">${esc(charName)}</span>` : ''}
               <span class="arc-col-title">${esc(arc.title)}</span>
             </div>
             <div style="display:flex;gap:2px;flex-shrink:0">
@@ -3241,6 +3243,8 @@ function renderPsyArc() {
                         </div>
                         ${chapterLine}
                         ${memoLine}
+                        ${s.beliefBefore ? `<div style="font-size:11px;color:var(--muted);line-height:1.5;white-space:pre-wrap;margin-top:4px">변화 전 · ${esc(s.beliefBefore)}</div>` : ''}
+                        ${s.choiceAfter ? `<div style="font-size:11px;color:var(--teal);line-height:1.5;white-space:pre-wrap;margin-top:3px">변화 후 · ${esc(s.choiceAfter)}</div>` : ''}
                         ${s.content ? `<div style="font-size:11px;color:var(--muted);line-height:1.6;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(s.content)}</div>` : ''}
                       </div>
                       <button onclick="event.stopPropagation();deletePsyStep(${ai},${si})"
@@ -3364,9 +3368,12 @@ const PSY_EMOTION_COLORS = {
   '성장':'#4caf50','변화':'#ab47bc','기타':'#9a8e7f'
 };
 
-function getCharColor(name, p) {
-  const c = (p.characters||[]).find(x => x.name === name);
-  return c?.color || 'var(--teal)';
+function getPsyArcCharacter(arc, p) {
+  const characters = p.characters || [];
+  if (arc.charId) return characters.find(c => c.id === arc.charId) || null;
+  if (!arc.charName) return null;
+  const matches = characters.filter(c => c.name === arc.charName);
+  return matches.length === 1 ? matches[0] : null;
 }
 
 // 배경색에 따라 흰색/검정 텍스트 자동 선택
@@ -3383,13 +3390,16 @@ function showPsyArcModal(idx) {
   const p = getProject();
   const arc = idx !== undefined ? (p.psyArcs||[])[idx] : {};
   const chars = p.characters || [];
+  const linkedChar = getPsyArcCharacter(arc, p);
+  const missingLink = !linkedChar && (arc.charId || arc.charName);
   showModal(`
     <div class="modal-title">${idx !== undefined ? '심리 아크 수정' : '심리 아크 추가'}</div>
     <div style="margin-bottom:12px">
       <label class="label">인물</label>
       <select id="pa-char">
         <option value="">인물 선택 (선택)</option>
-        ${chars.map(c => `<option value="${esc(c.name)}" ${arc.charName===c.name?'selected':''}>${esc(c.name)}</option>`).join('')}
+        ${missingLink ? `<option value="__keep__" selected>기존 연결: ${esc(arc.charName || '삭제된 인물')} (인물을 찾을 수 없음)</option>` : ''}
+        ${chars.map(c => `<option value="${esc(c.id)}" ${linkedChar?.id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
       </select>
     </div>
     <div style="margin-bottom:12px"><label class="label">아크 제목 *</label><input id="pa-title" value="${esc(arc.title||'')}" placeholder="예: 복수에서 용서로, 냉소주의자의 각성"></div>
@@ -3406,10 +3416,14 @@ function savePsyArc(idx) {
   if (!title) { toast('제목을 입력해주세요.'); return; }
   const p = getProject();
   if (!p.psyArcs) p.psyArcs = [];
+  const previous = idx !== undefined ? p.psyArcs[idx] : null;
+  const selectedId = document.getElementById('pa-char').value;
+  const selectedChar = (p.characters || []).find(c => c.id === selectedId);
   const arc = {
     id: idx !== undefined ? p.psyArcs[idx].id : uid(),
     title,
-    charName: document.getElementById('pa-char').value,
+    charId: selectedId === '__keep__' ? (previous?.charId || '') : (selectedChar?.id || ''),
+    charName: selectedId === '__keep__' ? (previous?.charName || '') : (selectedChar?.name || ''),
     description: document.getElementById('pa-desc').value,
     steps: idx !== undefined ? p.psyArcs[idx].steps : [],
   };
@@ -3448,6 +3462,8 @@ function showPsyStepModal(ai, si) {
       ${chapters.length === 0 ? '<div style="font-size:11px;color:var(--muted);margin-top:4px">아직 작성된 화가 없습니다.</div>' : ''}
     </div>
     <div style="margin-bottom:12px"><label class="label">계기 (보조 메모)</label><input id="ps-trigger" value="${esc(s.trigger||'')}" placeholder="예: 스승의 죽음 — 화와 별개로 자유롭게 적어도 됩니다"></div>
+    <div style="margin-bottom:12px"><label class="label">변화 전 생각 (선택)</label><textarea id="ps-before" rows="2" placeholder="예: 누구도 믿을 수 없다">${esc(s.beliefBefore||'')}</textarea></div>
+    <div style="margin-bottom:12px"><label class="label">변화 후 선택 (선택)</label><textarea id="ps-after" rows="2" placeholder="예: 동료를 믿고 위험을 함께 감수한다">${esc(s.choiceAfter||'')}</textarea></div>
     <div style="margin-bottom:20px"><label class="label">내면 묘사</label><textarea id="ps-content" rows="4" placeholder="이 시점 인물의 생각, 가치관, 감정을 자세히 기록하세요">${esc(s.content||'')}</textarea></div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
@@ -3467,6 +3483,8 @@ function savePsyStep(ai, si) {
     emotion: document.getElementById('ps-emotion').value,
     chapterId: document.getElementById('ps-chapter')?.value || '',
     trigger: document.getElementById('ps-trigger').value,
+    beliefBefore: document.getElementById('ps-before').value,
+    choiceAfter: document.getElementById('ps-after').value,
     content: document.getElementById('ps-content').value,
   };
   if (si !== undefined) p.psyArcs[ai].steps[si] = step;

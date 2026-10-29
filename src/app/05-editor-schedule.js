@@ -15,13 +15,15 @@ function renderChapters() {
   // 화 ID → 연결된 심리 단계 목록 (인물별)
   const psyByChapter = new Map(); // chapterId → [{emotion, charName, charColor, title}]
   (p.psyArcs || []).forEach(arc => {
-    const charColor = arc.charName ? getCharColor(arc.charName, p) : 'var(--gold)';
+    const character = getPsyArcCharacter(arc, p);
+    const charName = character?.name || arc.charName || '';
+    const charColor = charName ? (character?.color || 'var(--teal)') : 'var(--gold)';
     (arc.steps || []).forEach(s => {
       if (!s.chapterId) return;
       if (!psyByChapter.has(s.chapterId)) psyByChapter.set(s.chapterId, []);
       psyByChapter.get(s.chapterId).push({
         emotion: s.emotion,
-        charName: arc.charName || '',
+        charName,
         charColor,
         title: s.title || '',
       });

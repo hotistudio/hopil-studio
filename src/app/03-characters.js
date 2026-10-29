@@ -478,6 +478,16 @@ function saveChar(idx) {
     familyId: existing && typeof existing.familyId === 'string' ? existing.familyId : '',
   };
   const p = getProject();
+  // 기존 이름 기반 심리 아크도 인물 이름이 바뀌기 전에 ID로 연결한다.
+  if (existing && Array.isArray(p.psyArcs)) {
+    const uniqueOldName = (p.characters || []).filter(character => character.name === existing.name).length === 1;
+    p.psyArcs.forEach(arc => {
+      if (arc.charId === c.id || (!arc.charId && uniqueOldName && arc.charName === existing.name)) {
+        arc.charId = c.id;
+        arc.charName = c.name;
+      }
+    });
+  }
   if (idx !== undefined) p.characters[idx] = c;
   else p.characters.push(c);
   // 이 인물과 연결된 가문 멤버(들)의 이름/나이/성별/생사 동기화
