@@ -493,9 +493,10 @@ function renderFamilyTree() {
           <select onchange="ftSetFilter(this.value)" style="font-size:12px">${familyFilterOpts}</select>
         </label>
         <button class="btn btn-outline btn-sm" onclick="ftResetView()">⊕ 화면 맞춤</button>
+        <button class="btn btn-outline btn-sm" id="ft-edit-selected" onclick="ftOpenSelectedCharModal()" disabled>선택한 인물 편집</button>
         <span id="ft-zoom-label" style="font-size:11px;color:var(--muted);min-width:36px;text-align:center">100%</span>
         <div style="flex:1"></div>
-        <div style="font-size:10px;color:var(--muted)">배치는 자동입니다. 관계는 인물 편집에서 수정하세요.</div>
+        <div style="font-size:10px;color:var(--muted)">인물을 선택해 관계를 편집하세요. 배치는 자동입니다.</div>
       </div>
       <div class="diagram-canvas-wrap" id="ft-wrap" style="touch-action:none">
         ${chars.length === 0 ? ftEmptyState('아직 인물이 없습니다', '먼저 인물을 추가해보세요.')
@@ -902,6 +903,7 @@ function ftDrawTree() {
 
   // 엣지(선) 렌더
   ftDrawEdges(svg, chars, allPos);
+  ftUpdateEditButton();
 }
 
 function ftDrawEdges(svg, chars, pos) {
@@ -940,11 +942,8 @@ function ftDrawEdges(svg, chars, pos) {
     });
   });
 
-  // 부모-자식 선 (수직, 부모 쌍 중간점에서 자식으로)
+  // 부모-자식 선 (수직, 등록된 부모의 중간점에서 자식으로)
   // 같은 부모 쌍의 자식들은 공통 "분기점"을 공유.
-  // 한쪽 부모만 등록된 경우에도, 그 부모의 현재/사별 배우자가 있다면
-  // 배우자를 "암묵적 공동 부모"로 간주해 부부 중간점에서 분기한다.
-  // (편의상 '현재' 또는 '사별' 상태인 배우자만 인정)
   const unitsByParents = new Map();
   chars.forEach(c => {
     const ps = [...(c.parents || [])].filter(id => byId.has(id)).sort();
@@ -955,24 +954,8 @@ function ftDrawEdges(svg, chars, pos) {
   });
 
   unitsByParents.forEach(({parentIds, children}) => {
-    // 부모가 1명이고 그 부모에게 배우자가 있다면, 배우자를 시각적 공동 부모로 추가
-    let visualParentIds = [...parentIds];
-    if (visualParentIds.length === 1) {
-      const soleParent = byId.get(visualParentIds[0]);
-      if (soleParent) {
-        // '현재' 또는 '사별' 배우자 중 이 성분에 존재하고 같은 Y에 있는 사람
-        const candidate = (soleParent.spouses || []).find(sp => {
-          if (sp.status !== 'current' && sp.status !== 'deceased') return false;
-          const sPos = pos.get(sp.charId);
-          const pPos = pos.get(soleParent.id);
-          return sPos && pPos && sPos.y === pPos.y;
-        });
-        if (candidate) visualParentIds.push(candidate.charId);
-      }
-    }
-
-    // 부모(또는 시각적 부모) 중심점 계산
-    const parentCenters = visualParentIds.map(pid => {
+    // 등록된 부모만 연결한다. 배우자 관계만으로 공동 부모를 추정하지 않는다.
+    const parentCenters = parentIds.map(pid => {
       const pp = pos.get(pid);
       return pp ? { x: pp.x + FT_NODE_W/2, y: pp.y + FT_NODE_H } : null;
     }).filter(Boolean);
@@ -993,7 +976,7 @@ function ftDrawEdges(svg, chars, pos) {
     const childTopY = Math.min(...kidCenters.map(k => k.y));
     const busY = parentBottomY + (childTopY - parentBottomY) / 2;
 
-    // (1) 부모 중심(또는 부부 중간점)에서 수직으로 bus 까지
+    // (1) 등록된 부모의 중심에서 수직으로 bus 까지
     lines += `<line x1="${centerX}" y1="${parentBottomY}" x2="${centerX}" y2="${busY}" stroke="#6b5f4f" stroke-width="2.5"/>`;
 
     // (2) bus 가로선 (최좌/최우 자식까지)
@@ -1026,6 +1009,19 @@ function ftSelectNode(id) {
   document.querySelectorAll('.ft-node').forEach(el => {
     el.classList.toggle('selected', el.dataset.charId === ftState.selectedCharId);
   });
+  ftUpdateEditButton();
+}
+
+function ftUpdateEditButton() {
+  const button = document.getElementById('ft-edit-selected');
+  if (!button) return;
+  const selected = (getProject()?.characters || []).find(c => c.id === ftState.selectedCharId);
+  button.disabled = !selected;
+  button.textContent = selected ? `${selected.name} 편집` : '선택한 인물 편집';
+}
+
+function ftOpenSelectedCharModal() {
+  if (ftState.selectedCharId) ftOpenCharModal(ftState.selectedCharId);
 }
 
 function ftOpenCharModal(id) {

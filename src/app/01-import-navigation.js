@@ -329,6 +329,7 @@ function navigate(tab) {
     schedule: renderSchedule,
     diagram: renderDiagram,
     familytree: renderFamilyTree,
+    narrative: renderNarrativeTimeline,
     manuscript: renderManuscript,
     memo: renderMemo,
     family: renderFamily,

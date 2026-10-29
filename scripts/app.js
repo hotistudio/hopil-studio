@@ -493,9 +493,10 @@ function renderFamilyTree() {
           <select onchange="ftSetFilter(this.value)" style="font-size:12px">${familyFilterOpts}</select>
         </label>
         <button class="btn btn-outline btn-sm" onclick="ftResetView()">⊕ 화면 맞춤</button>
+        <button class="btn btn-outline btn-sm" id="ft-edit-selected" onclick="ftOpenSelectedCharModal()" disabled>선택한 인물 편집</button>
         <span id="ft-zoom-label" style="font-size:11px;color:var(--muted);min-width:36px;text-align:center">100%</span>
         <div style="flex:1"></div>
-        <div style="font-size:10px;color:var(--muted)">배치는 자동입니다. 관계는 인물 편집에서 수정하세요.</div>
+        <div style="font-size:10px;color:var(--muted)">인물을 선택해 관계를 편집하세요. 배치는 자동입니다.</div>
       </div>
       <div class="diagram-canvas-wrap" id="ft-wrap" style="touch-action:none">
         ${chars.length === 0 ? ftEmptyState('아직 인물이 없습니다', '먼저 인물을 추가해보세요.')
@@ -902,6 +903,7 @@ function ftDrawTree() {
 
   // 엣지(선) 렌더
   ftDrawEdges(svg, chars, allPos);
+  ftUpdateEditButton();
 }
 
 function ftDrawEdges(svg, chars, pos) {
@@ -940,11 +942,8 @@ function ftDrawEdges(svg, chars, pos) {
     });
   });
 
-  // 부모-자식 선 (수직, 부모 쌍 중간점에서 자식으로)
+  // 부모-자식 선 (수직, 등록된 부모의 중간점에서 자식으로)
   // 같은 부모 쌍의 자식들은 공통 "분기점"을 공유.
-  // 한쪽 부모만 등록된 경우에도, 그 부모의 현재/사별 배우자가 있다면
-  // 배우자를 "암묵적 공동 부모"로 간주해 부부 중간점에서 분기한다.
-  // (편의상 '현재' 또는 '사별' 상태인 배우자만 인정)
   const unitsByParents = new Map();
   chars.forEach(c => {
     const ps = [...(c.parents || [])].filter(id => byId.has(id)).sort();
@@ -955,24 +954,8 @@ function ftDrawEdges(svg, chars, pos) {
   });
 
   unitsByParents.forEach(({parentIds, children}) => {
-    // 부모가 1명이고 그 부모에게 배우자가 있다면, 배우자를 시각적 공동 부모로 추가
-    let visualParentIds = [...parentIds];
-    if (visualParentIds.length === 1) {
-      const soleParent = byId.get(visualParentIds[0]);
-      if (soleParent) {
-        // '현재' 또는 '사별' 배우자 중 이 성분에 존재하고 같은 Y에 있는 사람
-        const candidate = (soleParent.spouses || []).find(sp => {
-          if (sp.status !== 'current' && sp.status !== 'deceased') return false;
-          const sPos = pos.get(sp.charId);
-          const pPos = pos.get(soleParent.id);
-          return sPos && pPos && sPos.y === pPos.y;
-        });
-        if (candidate) visualParentIds.push(candidate.charId);
-      }
-    }
-
-    // 부모(또는 시각적 부모) 중심점 계산
-    const parentCenters = visualParentIds.map(pid => {
+    // 등록된 부모만 연결한다. 배우자 관계만으로 공동 부모를 추정하지 않는다.
+    const parentCenters = parentIds.map(pid => {
       const pp = pos.get(pid);
       return pp ? { x: pp.x + FT_NODE_W/2, y: pp.y + FT_NODE_H } : null;
     }).filter(Boolean);
@@ -993,7 +976,7 @@ function ftDrawEdges(svg, chars, pos) {
     const childTopY = Math.min(...kidCenters.map(k => k.y));
     const busY = parentBottomY + (childTopY - parentBottomY) / 2;
 
-    // (1) 부모 중심(또는 부부 중간점)에서 수직으로 bus 까지
+    // (1) 등록된 부모의 중심에서 수직으로 bus 까지
     lines += `<line x1="${centerX}" y1="${parentBottomY}" x2="${centerX}" y2="${busY}" stroke="#6b5f4f" stroke-width="2.5"/>`;
 
     // (2) bus 가로선 (최좌/최우 자식까지)
@@ -1026,6 +1009,19 @@ function ftSelectNode(id) {
   document.querySelectorAll('.ft-node').forEach(el => {
     el.classList.toggle('selected', el.dataset.charId === ftState.selectedCharId);
   });
+  ftUpdateEditButton();
+}
+
+function ftUpdateEditButton() {
+  const button = document.getElementById('ft-edit-selected');
+  if (!button) return;
+  const selected = (getProject()?.characters || []).find(c => c.id === ftState.selectedCharId);
+  button.disabled = !selected;
+  button.textContent = selected ? `${selected.name} 편집` : '선택한 인물 편집';
+}
+
+function ftOpenSelectedCharModal() {
+  if (ftState.selectedCharId) ftOpenCharModal(ftState.selectedCharId);
 }
 
 function ftOpenCharModal(id) {
@@ -1469,6 +1465,7 @@ function navigate(tab) {
     schedule: renderSchedule,
     diagram: renderDiagram,
     familytree: renderFamilyTree,
+    narrative: renderNarrativeTimeline,
     manuscript: renderManuscript,
     memo: renderMemo,
     family: renderFamily,
@@ -11827,6 +11824,130 @@ function deleteFamilyMember(fi, mi) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// 화 순서를 기준으로 이미 기록된 플롯·심리·복선을 함께 보여준다.
+// 연결되지 않은 항목은 추측해서 배치하지 않고 별도로 모은다.
+function buildNarrativeTimeline(project, foreshadowIndex) {
+  const chapters = (project.chapters || []).filter(ch => !ch.isFolder);
+  const makeLanes = () => ({ plot: [], psy: [], foreshadow: [] });
+  const rows = chapters.map((chapter, index) => ({ chapter, number: index + 1, lanes: makeLanes() }));
+  const byChapter = new Map(rows.map(row => [row.chapter.id, row]));
+  const unlinked = makeLanes();
+
+  function add(chapterId, lane, item) {
+    const row = byChapter.get(chapterId);
+    (row ? row.lanes : unlinked)[lane].push(item);
+  }
+
+  (project.arcs || []).forEach((arc, arcIndex) => {
+    (arc.scenes || []).forEach((scene, itemIndex) => add(scene.chapterId, 'plot', {
+      title: scene.title || '제목 없는 장면',
+      detail: arc.title || '플롯 아크',
+      sub: scene.type || '',
+      source: 'plot', arcIndex, itemIndex
+    }));
+  });
+
+  (project.psyArcs || []).forEach((arc, arcIndex) => {
+    const character = getPsyArcCharacter(arc, project);
+    const owner = character?.name || arc.charName || arc.title || '심리 아크';
+    (arc.steps || []).forEach((step, itemIndex) => add(step.chapterId, 'psy', {
+      title: step.title || '제목 없는 변화',
+      detail: owner,
+      sub: [step.beliefBefore && '변화 전', step.choiceAfter && '변화 후'].filter(Boolean).join(' → '),
+      source: 'psy', arcIndex, itemIndex
+    }));
+  });
+
+  (project.foreshadows || []).forEach((foreshadow, itemIndex) => {
+    const classified = classifyForeshadowChapters(foreshadow, foreshadowIndex);
+    const title = foreshadow.tagName || foreshadow.content || '제목 없는 복선';
+    const base = { title, source: 'foreshadow', itemIndex };
+    if (!classified.linked) {
+      add(null, 'foreshadow', { ...base, detail: '본문 태그 미연결', sub: '' });
+      return;
+    }
+    add(classified.planted, 'foreshadow', { ...base, detail: '🌱 첫 등장', sub: '' });
+    classified.mentioned.forEach(chapterId => {
+      add(chapterId, 'foreshadow', { ...base, detail: '💬 중간 언급', sub: '' });
+    });
+    if (classified.harvested) {
+      add(classified.harvested, 'foreshadow', { ...base, detail: '✅ 회수', sub: '' });
+    }
+  });
+
+  return { rows, unlinked };
+}
+
+function ntOpen(source, arcIndex, itemIndex) {
+  if (source === 'plot') {
+    navigate('plot');
+    showSceneModal(arcIndex, itemIndex);
+  } else if (source === 'psy') {
+    navigate('psyarc');
+    showPsyStepModal(arcIndex, itemIndex);
+  } else if (source === 'foreshadow') {
+    navigate('foreshadow');
+    const item = getProject()?.foreshadows?.[arcIndex];
+    if (item?.id) showForeshadowModal(item.id);
+  }
+}
+
+function ntOpenChapter(index) {
+  const chapter = (getProject()?.chapters || []).filter(ch => !ch.isFolder)[index];
+  if (chapter) gotoChapterFromScene(chapter.id);
+}
+
+function renderNarrativeTimeline() {
+  const project = getProject();
+  if (!project) return;
+  const { rows, unlinked } = buildNarrativeTimeline(project, buildForeshadowIndex());
+  const laneDefs = [
+    { key: 'plot', label: '플롯 장면' },
+    { key: 'psy', label: '심리 변화' },
+    { key: 'foreshadow', label: '복선' }
+  ];
+  const card = item => {
+    const onclick = item.source === 'foreshadow'
+      ? `ntOpen('foreshadow',${item.itemIndex})`
+      : `ntOpen('${item.source}',${item.arcIndex},${item.itemIndex})`;
+    return `<button class="nt-card nt-${item.source}" onclick="${onclick}" title="원본 기록 열기">
+      <span class="nt-card-title">${esc(item.title)}</span>
+      <span class="nt-card-detail">${esc(item.detail)}</span>
+      ${item.sub ? `<span class="nt-card-sub">${esc(item.sub)}</span>` : ''}
+    </button>`;
+  };
+  const lane = (items, definition) => `<div class="nt-lane nt-lane-${definition.key}">
+    <div class="nt-mobile-label">${definition.label}</div>
+    ${items.length ? items.map(card).join('') : '<span class="nt-empty">—</span>'}
+  </div>`;
+  const anyUnlinked = laneDefs.some(definition => unlinked[definition.key].length);
+
+  document.getElementById('main').innerHTML = `<div class="nt-page">
+    <div class="nt-heading">
+      <div>
+        <div class="font-display" style="font-size:22px">서사 타임라인</div>
+        <p>회차별 플롯·심리 변화·복선의 흐름을 함께 확인하세요. 항목을 누르면 원본 기록이 열립니다.</p>
+      </div>
+    </div>
+    ${rows.length ? `<div class="nt-grid-head"><span>회차</span>${laneDefs.map(definition => `<span>${definition.label}</span>`).join('')}</div>
+      <div class="nt-rows">${rows.map(row => `<section class="nt-row">
+        <div class="nt-chapter">
+          <button onclick="ntOpenChapter(${row.number - 1})">${row.number}화 · ${esc(row.chapter.title || '(제목 없음)')}</button>
+          <small>${laneDefs.reduce((sum, definition) => sum + row.lanes[definition.key].length, 0)}개 기록</small>
+        </div>
+        ${laneDefs.map(definition => lane(row.lanes[definition.key], definition)).join('')}
+      </section>`).join('')}</div>`
+      : `<div class="card empty-state"><div class="emoji">📖</div><p>회차를 만들면 서사 흐름을 확인할 수 있습니다.</p></div>`}
+    ${anyUnlinked ? `<section class="nt-unlinked">
+      <h3>회차에 연결되지 않은 기록</h3>
+      <p>플롯·심리 단계는 원본에서 회차를 지정할 수 있습니다. 복선은 본문에 태그를 넣으면 회차가 연결됩니다.</p>
+      <div class="nt-unlinked-grid">${laneDefs.map(definition => `<div>
+        <h4>${definition.label} · ${unlinked[definition.key].length}</h4>
+        ${unlinked[definition.key].length ? unlinked[definition.key].map(card).join('') : '<span class="nt-empty">—</span>'}
+      </div>`).join('')}</div>
+    </section>` : ''}
+  </div>`;
+}
 // 한글에서 편집 가능한 HWPX. 한컴 형식의 빈 문서를 서식 템플릿으로 사용한다.
 const HWPX_NS = {
   hp: 'http://www.hancom.co.kr/hwpml/2011/paragraph',
