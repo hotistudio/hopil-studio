@@ -39,13 +39,13 @@
 
 /* ─── 다크모드 ─────────────────────────────────────────────────── */
 [data-theme="dark"]{
-  --ink:#fafafa; --paper:#0a0a0a; --cream:#171717; --white:#171717;
+  --ink:#e5e5e5; --paper:#0a0a0a; --cream:#171717; --white:#171717;
   --gold:#fafafa; --gold2:#e5e5e5; --gold-light:#262626;
   --teal:#a3a3a3; --teal2:#d4d4d4; --teal-light:#171717;
   --rust:#f87171; --rust-light:#1c0a0a;
-  --muted:#737373; --border:#262626; --shadow:rgba(0,0,0,.5);
+  --muted:#a3a3a3; --border:#262626; --shadow:rgba(0,0,0,.5);
   /* 헤더 전용 (다크모드: 거의 검정 + 흰 텍스트) */
-  --header-bg:#0a0a0a; --header-fg:#fafafa;
+  --header-bg:#0a0a0a; --header-fg:#e5e5e5;
   --header-fg-soft:rgba(250,250,250,.6);
   --header-btn-bg:rgba(255,255,255,.08);
   --header-btn-bg-hover:rgba(255,255,255,.16);
