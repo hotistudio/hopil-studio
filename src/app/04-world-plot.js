@@ -1,8 +1,38 @@
 // WORLD
 // ═══════════════════════════════════════════════════════════════
+function worldFilterState(project) {
+  if (window._worldFilterProjectId === project.id) return;
+  window._worldFilterProjectId = project.id;
+  window._worldSearch = '';
+  window._worldCategory = '전체';
+  window._spWorldSearch = '';
+  window._spWorldCategory = '전체';
+}
+
+function worldUsedCategories(items, genre) {
+  const used = new Set(items.map(item => item.category || '기타'));
+  return [...getWorldCats(genre), ...used].filter((category, index, all) =>
+    used.has(category) && all.indexOf(category) === index);
+}
+
+function filterWorldSettings(items, query, category) {
+  const text = (query || '').trim().toLowerCase();
+  return items.map((item, index) => ({ item, index })).filter(({ item }) =>
+    (category === '전체' || (item.category || '기타') === category) &&
+    (!text || (item.title || '').toLowerCase().includes(text) || (item.content || '').toLowerCase().includes(text)));
+}
+
 function renderWorld() {
   const p = getProject();
+  worldFilterState(p);
   const items = p.worldSettings || [];
+  const search = window._worldSearch || '';
+  const category = window._worldCategory || '전체';
+  const filtered = filterWorldSettings(items, search, category);
+  const usedCategories = worldUsedCategories(items, p.genre);
+  const searching = !!search.trim() || category !== '전체';
+  const prevFocused = document.activeElement?.id === 'world-search';
+  const prevSelection = prevFocused ? document.activeElement.selectionStart : null;
   // worldTimeline id 보정
   if (p.worldTimeline) {
     let _fixed = false;
@@ -12,8 +42,11 @@ function renderWorld() {
   const events = (p.worldTimeline || []).slice().sort((a,b) => (a.year||0) - (b.year||0));
   const cats = getWorldCats(p.genre);
   const grouped = {};
-  cats.forEach(c => { grouped[c] = items.filter(i => i.category === c); });
-  items.forEach(i => { if (!grouped[i.category]) grouped[i.category] = items.filter(x => x.category === i.category); });
+  cats.forEach(c => { grouped[c] = filtered.filter(({ item }) => (item.category || '기타') === c); });
+  filtered.forEach(({ item }) => {
+    const cat = item.category || '기타';
+    if (!grouped[cat]) grouped[cat] = filtered.filter(entry => (entry.item.category || '기타') === cat);
+  });
 
   // 타임라인 HTML
   const TL_COLOR_MAP = {
@@ -135,14 +168,13 @@ function renderWorld() {
     html += `<div style="margin-bottom:20px">
       <div style="font-family:'Noto Serif KR',serif;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px;letter-spacing:1px">${esc(cat)}</div>
       <div style="display:grid;gap:10px">
-        ${catItems.map(w => {
-          const idx = items.findIndex(i => i.id === w.id);
+        ${catItems.map(({ item: w, index: idx }) => {
           return `
           <div class="card card-sm" style="padding:0;overflow:hidden">
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--cream);cursor:pointer;user-select:none" onclick="(function(el){var body=el.parentElement.querySelector('.world-main-body');var arrow=el.querySelector('.world-main-arrow');var isHidden=body.style.display==='none';body.style.display=isHidden?'':'none';arrow.style.transform=isHidden?'rotate(0deg)':'rotate(-90deg)'})(this)">
               <div style="font-weight:700;font-size:14px">${esc(w.title)}</div>
               <div style="display:flex;align-items:center;gap:6px">
-                <span class="world-main-arrow" style="color:var(--muted);font-size:10px;transition:transform .2s;display:inline-block;transform:rotate(-90deg)">▼</span>
+                <span class="world-main-arrow" style="color:var(--muted);font-size:10px;transition:transform .2s;display:inline-block;transform:rotate(${search.trim()?'0':'-90'}deg)">▼</span>
                 <button class="btn-icon" onclick="event.stopPropagation();showWorldModal(${idx})" style="width:28px;height:28px">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 </button>
@@ -152,7 +184,7 @@ function renderWorld() {
                     display:flex;align-items:center;justify-content:center">×</button>
               </div>
             </div>
-            <div class="world-main-body" style="padding:10px 14px;color:var(--muted);font-size:13px;line-height:1.7;white-space:pre-wrap;display:none">${esc(w.content)}</div>
+            <div class="world-main-body" style="padding:10px 14px;color:var(--muted);font-size:13px;line-height:1.7;white-space:pre-wrap;display:${search.trim()?'block':'none'}">${esc(w.content)}</div>
           </div>`;
         }).join('')}
       </div>
@@ -193,10 +225,33 @@ function renderWorld() {
         </div>
       </div>
 
+      ${items.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:18px">
+        <input id="world-search" value="${esc(search)}" placeholder="설정 이름·내용 검색..." aria-label="세계관 설정 검색"
+          oninput="window._worldSearch=this.value;clearTimeout(window._worldSearchT);window._worldSearchT=setTimeout(renderWorld,120)"
+          style="flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--paper);color:var(--ink)">
+        <select aria-label="세계관 분류 필터" onchange="window._worldCategory=this.value;renderWorld()"
+          style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--paper);color:var(--ink)">
+          <option value="전체">분류 전체</option>
+          ${usedCategories.map(cat => `<option value="${esc(cat)}" ${category===cat?'selected':''}>${esc(cat)}</option>`).join('')}
+        </select>
+        ${searching ? `<button class="btn btn-outline btn-sm" onclick="window._worldSearch='';window._worldCategory='전체';renderWorld()">초기화</button>` : ''}
+        <span style="font-size:11px;color:var(--muted)">${filtered.length} / ${items.length}개</span>
+      </div>` : ''}
+
       ${items.length === 0
         ? `<div class="card empty-state"><div class="emoji">🌍</div><p>세계관 설정을 추가해보세요.</p></div>`
-        : html}
+        : filtered.length === 0
+          ? `<div class="card empty-state"><div class="emoji">🔍</div><p>조건에 맞는 설정이 없어요.</p></div>`
+          : html}
     </div>`;
+  if (prevFocused) {
+    setTimeout(() => {
+      const input = document.getElementById('world-search');
+      if (!input) return;
+      input.focus();
+      if (prevSelection !== null) input.setSelectionRange(prevSelection, prevSelection);
+    }, 0);
+  }
 }
 
 function toggleTlDetail(id) {
@@ -313,7 +368,7 @@ function saveWorld(idx) {
   const _sp = document.getElementById('split-panel');
   const _inSp = _sp && !_sp.classList.contains('hidden') && splitTab === 'world';
   const _inFocus = document.getElementById('focus-overlay')?.classList.contains('active');
-  if (_inFocus) { refreshSplitPanel(); }
+  if (_inFocus) { focusRefTab(_focusRefTab); }
   else if (_inSp) { renderSplitContent(); }
   else { renderWorld(); }
 }

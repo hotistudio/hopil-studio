@@ -1035,6 +1035,7 @@ function renderSplitContent() {
 
   } else if (splitTab === 'world') {
     const worlds = p.worldSettings || [];
+    worldFilterState(p);
     if (!worlds.length) {
       el.innerHTML = `<div style="text-align:center;padding:30px 0">
         <div style="font-size:32px;margin-bottom:8px">🌍</div>
@@ -1043,39 +1044,24 @@ function renderSplitContent() {
       </div>`;
       return;
     }
-    const groups = {};
-    worlds.forEach((w,i) => {
-      const cat = w.category || '기타';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push({...w, _i:i});
-    });
-    // 장르 카테고리 순서대로 정렬
-    const orderedCats = [...getWorldCats(p.genre), ...Object.keys(groups).filter(c => !getWorldCats(p.genre).includes(c))];
-    const sortedGroups = orderedCats.filter(c => groups[c]).map(c => [c, groups[c]]);
-    if (!window._spWorldCol) window._spWorldCol = {};
     el.innerHTML = `
-      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px">
+        <span id="split-world-count" style="font-size:11px;color:var(--muted)"></span>
         <button class="btn btn-gold btn-sm" onclick="showWorldModal()">＋ 추가</button>
       </div>
-      ${sortedGroups.map(([cat, items]) => `
-        <div style="margin-bottom:16px">
-          <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;margin-bottom:6px">${esc(cat)}</div>
-          ${items.map(w => {
-            const col = window._spWorldCol[w._i] !== false ? true : false; // 기본 접힘
-            return `
-            <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden;background:var(--white)">
-              <div style="padding:8px 12px;background:var(--cream);display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none"
-                onclick="window._spWorldCol[${w._i}]=window._spWorldCol[${w._i}]===undefined?false:!window._spWorldCol[${w._i}];refreshSplitPanel()">
-                <span style="font-weight:700;font-size:13px">${esc(w.title)}</span>
-                <div style="display:flex;align-items:center;gap:6px">
-                  <span style="color:var(--muted);font-size:10px;transition:transform .2s;display:inline-block;transform:rotate(${col?'-90':'0'}deg)">▼</span>
-                  <button onclick="event.stopPropagation();showWorldModal(${w._i})" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--teal)">✏️</button>
-                </div>
-              </div>
-              ${col ? '' : `<div style="padding:8px 12px;font-size:12px;color:var(--muted);line-height:1.7;white-space:pre-wrap">${esc(w.content||'')}</div>`}
-            </div>`;
-          }).join('')}
-        </div>`).join('')}`;
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <input id="split-world-search" value="${esc(window._spWorldSearch)}" placeholder="설정 이름·내용 검색..." aria-label="세계관 설정 검색"
+          oninput="window._spWorldSearch=this.value;window._spWorldCol={};refreshSplitWorld()"
+          style="flex:1;min-width:120px;padding:7px 9px;border:1.5px solid var(--border);border-radius:8px;background:var(--paper);color:var(--ink)">
+        <select id="split-world-category" aria-label="세계관 분류 필터" onchange="window._spWorldCategory=this.value;refreshSplitWorld()"
+          style="max-width:100%;padding:7px 8px;border:1.5px solid var(--border);border-radius:8px;background:var(--paper);color:var(--ink)">
+          <option value="전체">분류 전체</option>
+          ${worldUsedCategories(worlds, p.genre).map(cat => `<option value="${esc(cat)}" ${window._spWorldCategory===cat?'selected':''}>${esc(cat)}</option>`).join('')}
+        </select>
+        <button id="split-world-clear" class="btn btn-outline btn-sm" onclick="resetSplitWorldFilter()">초기화</button>
+      </div>
+      <div id="split-world-inner"></div>`;
+    refreshSplitWorld();
 
   } else if (splitTab === 'relations') {
     const chars = p.characters || [];
@@ -2005,8 +1991,60 @@ function toggleSplitChar(idx) {
   refreshSplitPanel();
 }
 
+function resetSplitWorldFilter() {
+  window._spWorldSearch = '';
+  window._spWorldCategory = '전체';
+  window._spWorldCol = {};
+  const input = splitElement('split-world-search');
+  const select = splitElement('split-world-category');
+  if (input) input.value = '';
+  if (select) select.value = '전체';
+  refreshSplitWorld();
+}
+
+function refreshSplitWorld() {
+  const p = getProject();
+  const inner = splitElement('split-world-inner');
+  if (!p || !inner) return;
+  worldFilterState(p);
+  const worlds = p.worldSettings || [];
+  const query = window._spWorldSearch || '';
+  const category = window._spWorldCategory || '전체';
+  const filtered = filterWorldSettings(worlds, query, category);
+  const groups = worldUsedCategories(worlds, p.genre).map(cat => ({
+    cat, entries: filtered.filter(({ item }) => (item.category || '기타') === cat)
+  })).filter(group => group.entries.length);
+  if (!window._spWorldCol) window._spWorldCol = {};
+  const clear = splitElement('split-world-clear');
+  const count = splitElement('split-world-count');
+  if (clear) clear.style.display = query.trim() || category !== '전체' ? '' : 'none';
+  if (count) count.textContent = `${filtered.length} / ${worlds.length}개`;
+  inner.innerHTML = filtered.length === 0
+    ? '<div style="color:var(--muted);text-align:center;padding:20px 0;font-size:13px">조건에 맞는 설정이 없어요.</div>'
+    : groups.map(({ cat, entries }) => `<div style="margin-bottom:16px">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;margin-bottom:6px">${esc(cat)}</div>
+        ${entries.map(({ item: w, index }) => {
+          const collapsed = window._spWorldCol[index] === undefined ? !query.trim() : window._spWorldCol[index];
+          return `<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden;background:var(--white)">
+            <div style="padding:8px 12px;background:var(--cream);display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none"
+              onclick="window._spWorldCol[${index}]=${!collapsed};refreshSplitWorld()">
+              <span style="font-weight:700;font-size:13px">${esc(w.title)}</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="color:var(--muted);font-size:10px;transition:transform .2s;display:inline-block;transform:rotate(${collapsed?'-90':'0'}deg)">▼</span>
+                <button onclick="event.stopPropagation();showWorldModal(${index})" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--teal)">✏️</button>
+              </div>
+            </div>
+            ${collapsed ? '' : `<div style="padding:8px 12px;font-size:12px;color:var(--muted);line-height:1.7;white-space:pre-wrap">${esc(w.content||'')}</div>`}
+          </div>`;
+        }).join('')}
+      </div>`).join('');
+}
+
 function refreshSplitPanel() {
   if (document.getElementById('focus-overlay')?.classList.contains('active')) {
+    if (_focusRefTab === 'world' && splitElement('split-world-search')) {
+      refreshSplitWorld(); return;
+    }
     focusRefTab(_focusRefTab);
   } else {
     // 검색 input이 있는 탭은 내부 콘텐츠만 업데이트 (포커스 유지)
@@ -2015,6 +2053,9 @@ function refreshSplitPanel() {
     }
     if (splitTab === 'memo' && splitElement('split-memo-search')) {
       refreshSplitMemo(); return;
+    }
+    if (splitTab === 'world' && splitElement('split-world-search')) {
+      refreshSplitWorld(); return;
     }
     renderSplitContent();
   }

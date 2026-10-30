@@ -3,7 +3,7 @@
 // 오프라인 지원 + 리소스 캐싱
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'hopil-v0.6.27-20261030';
+const CACHE_VERSION = 'hopil-v0.6.28-20261030';
 const CACHE_NAME = `hopil-studio-${CACHE_VERSION}`;
 
 // 앱 셸 — 설치 시 미리 캐시할 리소스
@@ -15,9 +15,9 @@ const APP_SHELL = [
   './icons/icon-512.png',
   './assets/hwpx-template.json',
   './styles/fonts.css',
-  './styles/app.css?v=0.6.27',
+  './styles/app.css?v=0.6.28',
   './scripts/errors.js',
-  './scripts/app.js?v=0.6.27',
+  './scripts/app.js?v=0.6.28',
   './scripts/extension-01.js?v=0.6.12',
   './scripts/extension-02.js',
   './scripts/extension-03.js',
