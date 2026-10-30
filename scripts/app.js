@@ -2669,6 +2669,21 @@ function filterWorldSettings(items, query, category) {
     (!text || (item.title || '').toLowerCase().includes(text) || (item.content || '').toLowerCase().includes(text)));
 }
 
+function ensureWorldTimelineIds(project) {
+  let fixed = false;
+  (project.worldTimeline || []).forEach(event => {
+    if (!event.id) { event.id = uid(); fixed = true; }
+  });
+  if (fixed) autoSave();
+}
+
+function openWorldChronicle(index) {
+  const event = getProject()?.chronicles?.[index];
+  if (!event?.id) { toast('연결된 사건 일지를 찾을 수 없어요.'); return; }
+  navigate('chronicle');
+  showChronicleModal(event.id);
+}
+
 function renderWorld() {
   const p = getProject();
   worldFilterState(p);
@@ -2680,12 +2695,7 @@ function renderWorld() {
   const searching = !!search.trim() || category !== '전체';
   const prevFocused = document.activeElement?.id === 'world-search';
   const prevSelection = prevFocused ? document.activeElement.selectionStart : null;
-  // worldTimeline id 보정
-  if (p.worldTimeline) {
-    let _fixed = false;
-    p.worldTimeline.forEach(e => { if (!e.id) { e.id = uid(); _fixed = true; } });
-    if (_fixed) autoSave();
-  }
+  ensureWorldTimelineIds(p);
   const events = (p.worldTimeline || []).slice().sort((a,b) => (a.year||0) - (b.year||0));
   const cats = getWorldCats(p.genre);
   const grouped = {};
@@ -2782,6 +2792,8 @@ function renderWorld() {
           ${events.map((ev, ei) => {
             const color = TL_COLOR_MAP[ev.type] || TL_COLOR_MAP['기타'];
             const evIdEsc = esc(ev.id||'');
+            const linkedChronicles = (p.chronicles || []).map((event, index) => ({ event, index }))
+              .filter(({ event }) => event.worldEventId === ev.id);
             return `
             <div id="tld-${evIdEsc}" style="display:none;border:1.5px solid ${color};border-radius:10px;overflow:hidden">
               <div style="padding:10px 14px;background:${color}18;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -2800,6 +2812,10 @@ function renderWorld() {
                   ${ev.chars ? `<div style="font-size:12px"><span style="color:var(--muted)">👤 인물</span> ${esc(ev.chars)}</div>` : ''}
                   ${ev.place ? `<div style="font-size:12px"><span style="color:var(--muted)">📍 장소</span> ${esc(ev.place)}</div>` : ''}
                 </div>
+                ${linkedChronicles.length ? `<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                  <span style="font-size:11px;color:var(--muted)">사건 일지 ${linkedChronicles.length}건</span>
+                  ${linkedChronicles.map(({ event, index }) => `<button class="btn btn-outline btn-sm" onclick="openWorldChronicle(${index})" title="사건 일지 열기">${esc(event.title || '(제목 없음)')}</button>`).join('')}
+                </div>` : ''}
               </div>
             </div>`;
           }).join('')}
@@ -2968,6 +2984,9 @@ function deleteTimeline(id) {
   const p = getProject();
   const i = p?.worldTimeline?.findIndex(e => e.id === id) ?? -1;
   if (i < 0) return;
+  (p.chronicles || []).forEach(event => {
+    if (event.worldEventId === id) event.worldEventId = '';
+  });
   p.worldTimeline.splice(i, 1);
   autoSave(); closeModal(); renderWorld();
   toast('사건을 삭제했어요.');
@@ -9800,6 +9819,24 @@ function crJumpToPlotScene(sceneId) {
   showSceneModal(linked.arcIndex, linked.sceneIndex);
 }
 
+function _crGetWorldEvent(worldEventId) {
+  if (!worldEventId) return null;
+  const index = (getProject()?.worldTimeline || []).findIndex(event => event.id === worldEventId);
+  if (index < 0) return null;
+  return { event: getProject().worldTimeline[index], index };
+}
+
+function crJumpToWorldEvent(index) {
+  const event = getProject()?.worldTimeline?.[index];
+  if (!event?.id) { toast('연결된 세계관 사건을 찾을 수 없어요.'); return; }
+  navigate('world');
+  const detail = document.getElementById(`tld-${event.id}`);
+  if (detail) {
+    detail.style.display = 'block';
+    detail.scrollIntoView?.({ block: 'center' });
+  }
+}
+
 // 회차 ID → 정렬용 순서(배열 인덱스). 연결 없으면 Infinity (맨 뒤)
 function _crChapterOrder(chapterId) {
   if (!chapterId) return Infinity;
@@ -10009,6 +10046,7 @@ function renderChronicle() {
               const evIdEsc = esc(ev.id||'');
               const linkedCh = _crGetChapter(ev.chapterId);
               const linkedScene = _crGetPlotScene(ev.sceneId);
+              const linkedWorld = _crGetWorldEvent(ev.worldEventId);
               return `
               <div class="ev-drag-item" data-ev-id="${evIdEsc}" style="position:relative;margin-bottom:16px">
                 <div style="position:absolute;left:-20px;top:14px;width:10px;height:10px;border-radius:50%;
@@ -10029,6 +10067,9 @@ function renderChronicle() {
                         ${linkedScene ? `<button onclick="crJumpToPlotScene('${esc(linkedScene.scene.id)}')"
                           style="font-size:11px;color:var(--gold);background:var(--gold-light);border:none;padding:2px 8px;border-radius:10px;cursor:pointer;font-weight:600;font-family:'Noto Sans KR',sans-serif"
                           title="연결된 플롯 장면 열기">🗺️ ${esc(linkedScene.scene.title||'(제목 없음)')}</button>` : ''}
+                        ${linkedWorld ? `<button onclick="crJumpToWorldEvent(${linkedWorld.index})"
+                          style="font-size:11px;color:var(--teal);background:var(--teal-light);border:none;padding:2px 8px;border-radius:10px;cursor:pointer;font-weight:600;font-family:'Noto Sans KR',sans-serif"
+                          title="세계관 사건 열기">🌍 ${esc(linkedWorld.event.title||'(제목 없음)')}</button>` : ''}
                         ${ev.place?`<span style="font-size:11px;color:var(--muted)">📍 ${esc(ev.place)}</span>`:''}
                         ${charsStr?`<span style="font-size:11px;color:var(--muted)">👤 ${esc(charsStr)}</span>`:''}
                       </div>
@@ -10073,6 +10114,11 @@ function showChronicleModal(id) {
   const IMPORTANCE = ['★★★ 핵심','★★ 중요','★ 일반'];
   const idEsc = esc(id||'');
   const chapters = (p.chapters||[]).filter(c => !c.isFolder);
+  ensureWorldTimelineIds(p);
+  const worldEvents = p.worldTimeline || [];
+  const worldOpts = worldEvents.map(event =>
+    `<option value="${esc(event.id)}" ${evData.worldEventId===event.id?'selected':''}>${esc(event.yearLabel || String(event.year ?? '시기 미정'))} · ${esc(event.title || '(제목 없음)')}</option>`
+  ).join('');
   let sceneIdsAdded = false;
   const plotScenes = (p.arcs || []).flatMap(arc => (arc.scenes || []).map(scene => {
     if (!scene.id) { scene.id = uid(); sceneIdsAdded = true; }
@@ -10118,6 +10164,14 @@ function showChronicleModal(id) {
         <select id="cr-scene">
           <option value="" ${!evData.sceneId?'selected':''}>— 연결 안 함 —</option>
           ${sceneOpts}
+        </select></div>` : ''}
+      ${worldEvents.length > 0 ? `
+      <div class="full"><label class="label">관련 세계관 사건
+        <span style="font-size:11px;color:var(--muted);font-weight:500">— 역사 타임라인의 사건 (선택사항)</span>
+      </label>
+        <select id="cr-world-event">
+          <option value="" ${!evData.worldEventId?'selected':''}>— 연결 안 함 —</option>
+          ${worldOpts}
         </select></div>` : ''}
       <div class="full"><label class="label">관련 인물</label>
         ${chars.length===0
@@ -10186,6 +10240,7 @@ function saveChronicle(id) {
     importance: document.getElementById('cr-importance').value,
     chapterId: document.getElementById('cr-chapter')?.value || '',
     sceneId: document.getElementById('cr-scene')?.value || '',
+    worldEventId: document.getElementById('cr-world-event')?.value || '',
     sortKey,
     order: defaultOrder,
     chars: charsArr,

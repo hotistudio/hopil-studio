@@ -1731,6 +1731,24 @@ function crJumpToPlotScene(sceneId) {
   showSceneModal(linked.arcIndex, linked.sceneIndex);
 }
 
+function _crGetWorldEvent(worldEventId) {
+  if (!worldEventId) return null;
+  const index = (getProject()?.worldTimeline || []).findIndex(event => event.id === worldEventId);
+  if (index < 0) return null;
+  return { event: getProject().worldTimeline[index], index };
+}
+
+function crJumpToWorldEvent(index) {
+  const event = getProject()?.worldTimeline?.[index];
+  if (!event?.id) { toast('연결된 세계관 사건을 찾을 수 없어요.'); return; }
+  navigate('world');
+  const detail = document.getElementById(`tld-${event.id}`);
+  if (detail) {
+    detail.style.display = 'block';
+    detail.scrollIntoView?.({ block: 'center' });
+  }
+}
+
 // 회차 ID → 정렬용 순서(배열 인덱스). 연결 없으면 Infinity (맨 뒤)
 function _crChapterOrder(chapterId) {
   if (!chapterId) return Infinity;
@@ -1940,6 +1958,7 @@ function renderChronicle() {
               const evIdEsc = esc(ev.id||'');
               const linkedCh = _crGetChapter(ev.chapterId);
               const linkedScene = _crGetPlotScene(ev.sceneId);
+              const linkedWorld = _crGetWorldEvent(ev.worldEventId);
               return `
               <div class="ev-drag-item" data-ev-id="${evIdEsc}" style="position:relative;margin-bottom:16px">
                 <div style="position:absolute;left:-20px;top:14px;width:10px;height:10px;border-radius:50%;
@@ -1960,6 +1979,9 @@ function renderChronicle() {
                         ${linkedScene ? `<button onclick="crJumpToPlotScene('${esc(linkedScene.scene.id)}')"
                           style="font-size:11px;color:var(--gold);background:var(--gold-light);border:none;padding:2px 8px;border-radius:10px;cursor:pointer;font-weight:600;font-family:'Noto Sans KR',sans-serif"
                           title="연결된 플롯 장면 열기">🗺️ ${esc(linkedScene.scene.title||'(제목 없음)')}</button>` : ''}
+                        ${linkedWorld ? `<button onclick="crJumpToWorldEvent(${linkedWorld.index})"
+                          style="font-size:11px;color:var(--teal);background:var(--teal-light);border:none;padding:2px 8px;border-radius:10px;cursor:pointer;font-weight:600;font-family:'Noto Sans KR',sans-serif"
+                          title="세계관 사건 열기">🌍 ${esc(linkedWorld.event.title||'(제목 없음)')}</button>` : ''}
                         ${ev.place?`<span style="font-size:11px;color:var(--muted)">📍 ${esc(ev.place)}</span>`:''}
                         ${charsStr?`<span style="font-size:11px;color:var(--muted)">👤 ${esc(charsStr)}</span>`:''}
                       </div>
@@ -2004,6 +2026,11 @@ function showChronicleModal(id) {
   const IMPORTANCE = ['★★★ 핵심','★★ 중요','★ 일반'];
   const idEsc = esc(id||'');
   const chapters = (p.chapters||[]).filter(c => !c.isFolder);
+  ensureWorldTimelineIds(p);
+  const worldEvents = p.worldTimeline || [];
+  const worldOpts = worldEvents.map(event =>
+    `<option value="${esc(event.id)}" ${evData.worldEventId===event.id?'selected':''}>${esc(event.yearLabel || String(event.year ?? '시기 미정'))} · ${esc(event.title || '(제목 없음)')}</option>`
+  ).join('');
   let sceneIdsAdded = false;
   const plotScenes = (p.arcs || []).flatMap(arc => (arc.scenes || []).map(scene => {
     if (!scene.id) { scene.id = uid(); sceneIdsAdded = true; }
@@ -2049,6 +2076,14 @@ function showChronicleModal(id) {
         <select id="cr-scene">
           <option value="" ${!evData.sceneId?'selected':''}>— 연결 안 함 —</option>
           ${sceneOpts}
+        </select></div>` : ''}
+      ${worldEvents.length > 0 ? `
+      <div class="full"><label class="label">관련 세계관 사건
+        <span style="font-size:11px;color:var(--muted);font-weight:500">— 역사 타임라인의 사건 (선택사항)</span>
+      </label>
+        <select id="cr-world-event">
+          <option value="" ${!evData.worldEventId?'selected':''}>— 연결 안 함 —</option>
+          ${worldOpts}
         </select></div>` : ''}
       <div class="full"><label class="label">관련 인물</label>
         ${chars.length===0
@@ -2117,6 +2152,7 @@ function saveChronicle(id) {
     importance: document.getElementById('cr-importance').value,
     chapterId: document.getElementById('cr-chapter')?.value || '',
     sceneId: document.getElementById('cr-scene')?.value || '',
+    worldEventId: document.getElementById('cr-world-event')?.value || '',
     sortKey,
     order: defaultOrder,
     chars: charsArr,
