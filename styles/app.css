@@ -438,7 +438,7 @@ html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacit
 .nt-page{max-width:1500px;margin:0 auto;padding-bottom:28px}
 .nt-heading{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
 .nt-heading p,.nt-unlinked p{font-size:12px;line-height:1.6;color:var(--muted);margin:5px 0 0}
-.nt-grid-head,.nt-row{display:grid;grid-template-columns:minmax(150px,190px) repeat(3,minmax(0,1fr));gap:10px}
+.nt-grid-head,.nt-row{display:grid;grid-template-columns:minmax(150px,190px) repeat(4,minmax(0,1fr));gap:10px}
 .nt-grid-head{padding:0 12px 8px;color:var(--muted);font-size:11px;font-weight:700}
 .nt-row{padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--white);margin-bottom:8px;align-items:start}
 .nt-chapter{display:flex;flex-direction:column;gap:5px;min-width:0}
@@ -450,6 +450,7 @@ html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacit
 .nt-card:hover{box-shadow:0 2px 8px var(--shadow);border-color:var(--gold)}
 .nt-card:focus-visible,.nt-chapter button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
 .nt-card.nt-psy{border-left-color:var(--teal)}
+.nt-card.nt-chronicle{border-left-color:var(--gold2)}
 .nt-card.nt-foreshadow{border-left-color:var(--rust)}
 .nt-card-title{font-size:12px;font-weight:700;overflow-wrap:anywhere}
 .nt-card-detail{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
@@ -458,7 +459,7 @@ html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacit
 .nt-mobile-label{display:none}
 .nt-unlinked{margin-top:22px;padding:16px;border:1px dashed var(--border);border-radius:10px;background:var(--white)}
 .nt-unlinked h3{font-size:14px;color:var(--ink);margin:0}
-.nt-unlinked-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}
+.nt-unlinked-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:14px}
 .nt-unlinked-grid>div{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
 .nt-unlinked-grid h4{font-size:11px;color:var(--muted);margin:0 0 2px}
 @media(max-width:900px){

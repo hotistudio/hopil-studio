@@ -10,7 +10,7 @@ const project = {
     { id: 'c3', title: '결말' }
   ],
   arcs: [{ title: '1부', scenes: [
-    { title: '만남', chapterId: 'c1', chapterOrder: 2 },
+    { id: 's1', title: '만남', chapterId: 'c1', chapterOrder: 2 },
     { title: '미배치 장면', chapterId: '' }
   ] }, { title: '조연', scenes: [
     { title: '교차 장면', chapterId: 'c1', chapterOrder: 1 }
@@ -22,6 +22,10 @@ const project = {
   foreshadows: [
     { id: 'f1', tagName: '열쇠' },
     { id: 'f2', tagName: '미등록' }
+  ],
+  chronicles: [
+    { id: 'e1', title: '밀약', time: '봄', chapterId: 'c1', sceneId: 's1' },
+    { id: 'e2', title: '과거의 전쟁', time: '10년 전', chapterId: '' }
   ]
 };
 const main = { innerHTML: '' };
@@ -39,6 +43,7 @@ const context = vm.createContext({
   showSceneModal: (...args) => calls.push(['scene', ...args]),
   showPsyStepModal: (...args) => calls.push(['psy', ...args]),
   showForeshadowModal: id => calls.push(['foreshadow', id]),
+  showChronicleModal: id => calls.push(['chronicle', id]),
   gotoChapterFromScene: id => calls.push(['chapter', id])
 });
 vm.runInContext(fs.readFileSync('src/app/04-world-plot.js', 'utf8'), context);
@@ -50,12 +55,15 @@ assert.equal(data.rows.length, 3);
 assert.deepEqual(Array.from(data.rows[0].lanes.plot, item => item.title), ['교차 장면', '만남']);
 assert.equal(data.rows[0].lanes.plot[0].detail, '1번째 · 조연');
 assert.equal(data.rows[0].lanes.foreshadow[0].detail, '🌱 첫 등장');
+assert.equal(data.rows[0].lanes.chronicle[0].title, '밀약');
+assert.equal(data.rows[0].lanes.chronicle[0].detail, '봄');
 assert.equal(data.rows[1].lanes.psy[0].detail, '주인공');
 assert.equal(data.rows[1].lanes.foreshadow[0].detail, '💬 중간 언급');
 assert.equal(data.rows[2].lanes.foreshadow[0].detail, '✅ 회수');
 assert.equal(data.unlinked.plot[0].title, '미배치 장면');
 assert.equal(data.unlinked.psy[0].title, '미배치 변화');
 assert.equal(data.unlinked.foreshadow[0].title, '미등록');
+assert.equal(data.unlinked.chronicle[0].title, '과거의 전쟁');
 
 context.renderNarrativeTimeline();
 assert.match(main.innerHTML, /서사 타임라인/);
@@ -64,11 +72,13 @@ assert.doesNotMatch(main.innerHTML, /묶음<\/button>/);
 context.ntOpen('plot', 0, 0);
 context.ntOpen('psy', 0, 0);
 context.ntOpen('foreshadow', 0);
+context.ntOpen('chronicle', 0);
 context.ntOpenChapter(1);
 assert.deepEqual(calls, [
   ['navigate', 'plot'], ['scene', 0, 0],
   ['navigate', 'psyarc'], ['psy', 0, 0],
   ['navigate', 'foreshadow'], ['foreshadow', 'f1'],
+  ['navigate', 'chronicle'], ['chronicle', 'e1'],
   ['chapter', 'c2']
 ]);
 

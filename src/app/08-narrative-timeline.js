@@ -1,8 +1,8 @@
-// 화 순서를 기준으로 이미 기록된 플롯·심리·복선을 함께 보여준다.
+// 화 순서를 기준으로 이미 기록된 사건·플롯·심리·복선을 함께 보여준다.
 // 연결되지 않은 항목은 추측해서 배치하지 않고 별도로 모은다.
 function buildNarrativeTimeline(project, foreshadowIndex) {
   const chapters = (project.chapters || []).filter(ch => !ch.isFolder);
-  const makeLanes = () => ({ plot: [], psy: [], foreshadow: [] });
+  const makeLanes = () => ({ chronicle: [], plot: [], psy: [], foreshadow: [] });
   const rows = chapters.map((chapter, index) => ({ chapter, number: index + 1, lanes: makeLanes() }));
   const byChapter = new Map(rows.map(row => [row.chapter.id, row]));
   const unlinked = makeLanes();
@@ -25,6 +25,15 @@ function buildNarrativeTimeline(project, foreshadowIndex) {
     addPlotScene(entry, group.chapter.id, index + 1);
   }));
   plotFlow.unlinked.forEach(entry => addPlotScene(entry, null, null));
+
+  (project.chronicles || []).forEach((event, itemIndex) => {
+    add(event.chapterId, 'chronicle', {
+      title: event.title || '제목 없는 사건',
+      detail: event.time || '시점 미입력',
+      sub: event.place || '',
+      source: 'chronicle', itemIndex
+    });
+  });
 
   (project.psyArcs || []).forEach((arc, arcIndex) => {
     const character = getPsyArcCharacter(arc, project);
@@ -68,6 +77,10 @@ function ntOpen(source, arcIndex, itemIndex) {
     navigate('foreshadow');
     const item = getProject()?.foreshadows?.[arcIndex];
     if (item?.id) showForeshadowModal(item.id);
+  } else if (source === 'chronicle') {
+    const item = getProject()?.chronicles?.[arcIndex];
+    navigate('chronicle');
+    if (item?.id) showChronicleModal(item.id);
   }
 }
 
@@ -81,6 +94,7 @@ function renderNarrativeTimeline() {
   if (!project) return;
   const { rows, unlinked } = buildNarrativeTimeline(project, buildForeshadowIndex());
   const laneDefs = [
+    { key: 'chronicle', label: '사건' },
     { key: 'plot', label: '플롯 장면' },
     { key: 'psy', label: '심리 변화' },
     { key: 'foreshadow', label: '복선' }
@@ -88,6 +102,8 @@ function renderNarrativeTimeline() {
   const card = item => {
     const onclick = item.source === 'foreshadow'
       ? `ntOpen('foreshadow',${item.itemIndex})`
+      : item.source === 'chronicle'
+      ? `ntOpen('chronicle',${item.itemIndex})`
       : `ntOpen('${item.source}',${item.arcIndex},${item.itemIndex})`;
     return `<button class="nt-card nt-${item.source}" onclick="${onclick}" title="원본 기록 열기">
       <span class="nt-card-title">${esc(item.title)}</span>
@@ -105,7 +121,7 @@ function renderNarrativeTimeline() {
     <div class="nt-heading">
       <div>
         <div class="font-display" style="font-size:22px">서사 타임라인</div>
-        <p>회차별 플롯·심리 변화·복선의 흐름을 함께 확인하세요. 항목을 누르면 원본 기록이 열립니다.</p>
+        <p>회차별 사건·플롯·심리 변화·복선의 흐름을 함께 확인하세요. 항목을 누르면 원본 기록이 열립니다.</p>
       </div>
     </div>
     ${rows.length ? `<div class="nt-grid-head"><span>회차</span>${laneDefs.map(definition => `<span>${definition.label}</span>`).join('')}</div>
@@ -119,7 +135,7 @@ function renderNarrativeTimeline() {
       : `<div class="card empty-state"><div class="emoji">📖</div><p>회차를 만들면 서사 흐름을 확인할 수 있습니다.</p></div>`}
     ${anyUnlinked ? `<section class="nt-unlinked">
       <h3>회차에 연결되지 않은 기록</h3>
-      <p>플롯·심리 단계는 원본에서 회차를 지정할 수 있습니다. 복선은 본문에 태그를 넣으면 회차가 연결됩니다.</p>
+      <p>사건·플롯·심리 단계는 원본에서 회차를 지정할 수 있습니다. 복선은 본문에 태그를 넣으면 회차가 연결됩니다.</p>
       <div class="nt-unlinked-grid">${laneDefs.map(definition => `<div>
         <h4>${definition.label} · ${unlinked[definition.key].length}</h4>
         ${unlinked[definition.key].length ? unlinked[definition.key].map(card).join('') : '<span class="nt-empty">—</span>'}

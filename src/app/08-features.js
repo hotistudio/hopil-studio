@@ -1714,6 +1714,23 @@ function _crGetChapter(chapterId) {
   return (p?.chapters||[]).find(c => c.id === chapterId) || null;
 }
 
+function _crGetPlotScene(sceneId) {
+  if (!sceneId) return null;
+  const p = getProject();
+  for (const [arcIndex, arc] of (p?.arcs || []).entries()) {
+    const sceneIndex = (arc.scenes || []).findIndex(scene => scene.id === sceneId);
+    if (sceneIndex >= 0) return { arc, scene: arc.scenes[sceneIndex], arcIndex, sceneIndex };
+  }
+  return null;
+}
+
+function crJumpToPlotScene(sceneId) {
+  const linked = _crGetPlotScene(sceneId);
+  if (!linked) { toast('연결된 플롯 장면을 찾을 수 없어요.'); return; }
+  navigate('plot');
+  showSceneModal(linked.arcIndex, linked.sceneIndex);
+}
+
 // 회차 ID → 정렬용 순서(배열 인덱스). 연결 없으면 Infinity (맨 뒤)
 function _crChapterOrder(chapterId) {
   if (!chapterId) return Infinity;
@@ -1912,6 +1929,7 @@ function renderChronicle() {
               const charsStr = _crCharsStr(ev);
               const evIdEsc = esc(ev.id||'');
               const linkedCh = _crGetChapter(ev.chapterId);
+              const linkedScene = _crGetPlotScene(ev.sceneId);
               return `
               <div class="ev-drag-item" data-ev-id="${evIdEsc}" style="position:relative;margin-bottom:16px">
                 <div style="position:absolute;left:-20px;top:14px;width:10px;height:10px;border-radius:50%;
@@ -1930,6 +1948,9 @@ function renderChronicle() {
                         ${linkedCh ? `<button onclick="crJumpToChapter('${esc(linkedCh.id)}')"
                           style="font-size:11px;color:var(--teal);background:var(--teal-light);border:none;padding:2px 8px;border-radius:10px;cursor:pointer;font-weight:600;font-family:'Noto Sans KR',sans-serif"
                           title="이 회차로 이동">📖 ${esc(linkedCh.title||'(제목 없음)')}</button>` : ''}
+                        ${linkedScene ? `<button onclick="crJumpToPlotScene('${esc(linkedScene.scene.id)}')"
+                          style="font-size:11px;color:var(--gold);background:var(--gold-light);border:none;padding:2px 8px;border-radius:10px;cursor:pointer;font-weight:600;font-family:'Noto Sans KR',sans-serif"
+                          title="연결된 플롯 장면 열기">🗺️ ${esc(linkedScene.scene.title||'(제목 없음)')}</button>` : ''}
                         ${ev.place?`<span style="font-size:11px;color:var(--muted)">📍 ${esc(ev.place)}</span>`:''}
                         ${charsStr?`<span style="font-size:11px;color:var(--muted)">👤 ${esc(charsStr)}</span>`:''}
                       </div>
@@ -1974,6 +1995,15 @@ function showChronicleModal(id) {
   const IMPORTANCE = ['★★★ 핵심','★★ 중요','★ 일반'];
   const idEsc = esc(id||'');
   const chapters = (p.chapters||[]).filter(c => !c.isFolder);
+  let sceneIdsAdded = false;
+  const plotScenes = (p.arcs || []).flatMap(arc => (arc.scenes || []).map(scene => {
+    if (!scene.id) { scene.id = uid(); sceneIdsAdded = true; }
+    return { arc, scene };
+  }));
+  if (sceneIdsAdded) autoSave();
+  const sceneOpts = plotScenes.map(({ arc, scene }) =>
+    `<option value="${esc(scene.id)}" ${evData.sceneId===scene.id?'selected':''}>${esc(arc.title||'플롯 아크')} · ${esc(scene.title||'(제목 없음)')}</option>`
+  ).join('');
   const chOpts = chapters.map(c => {
     const folder = (p.chapterFolders||[]).find(f => f.id === c.folderId);
     const prefix = folder ? `[${folder.name}] ` : '';
@@ -1982,14 +2012,15 @@ function showChronicleModal(id) {
   showModal(`
     <div class="modal-title">${isEdit ? '사건 수정' : '사건 추가'}</div>
     <div class="form-grid">
-      <div><label class="label">작품 내 시점 *
-        <span style="font-size:11px;color:var(--muted);font-weight:500">— 자유 표기</span>
+       <div><label class="label">작품 내 시점 *
+         <span style="font-size:11px;color:var(--muted);font-weight:500">— 화면에 표시할 시기</span>
       </label>
         <input id="cr-time" value="${esc(evData.time||'')}" placeholder="예: 즉위 5년 봄, D+3일"></div>
       <div><label class="label">작중 연대순
-        <span style="font-size:11px;color:var(--muted);font-weight:500">— 정렬용 숫자 (선택)</span>
+         <span style="font-size:11px;color:var(--muted);font-weight:500">— 연대순 보기용 숫자 (선택)</span>
       </label>
-        <input id="cr-sortkey" type="number" step="any" value="${evData.sortKey ?? ''}" placeholder="예: 1, 2, 2.5"></div>
+         <input id="cr-sortkey" type="number" step="any" value="${evData.sortKey ?? ''}" placeholder="예: 1, 2, 2.5">
+         <small style="display:block;margin-top:4px;color:var(--muted)">비워두면 연대순 보기의 맨 뒤에 표시됩니다. 수동 보기의 순서는 드래그로 바꿀 수 있어요.</small></div>
       <div class="full"><label class="label">사건 제목 *</label>
         <input id="cr-title" value="${esc(evData.title||'')}" placeholder="사건을 한 줄로 요약"></div>
       <div class="full"><label class="label">사건 내용</label>
@@ -2005,6 +2036,14 @@ function showChronicleModal(id) {
         <select id="cr-chapter">
           <option value="" ${!evData.chapterId?'selected':''}>— 연결 안 함 —</option>
           ${chOpts}
+        </select></div>` : ''}
+      ${plotScenes.length > 0 ? `
+      <div class="full"><label class="label">연결된 플롯 장면
+        <span style="font-size:11px;color:var(--muted);font-weight:500">— 이 사건을 보여주는 장면 (선택사항)</span>
+      </label>
+        <select id="cr-scene">
+          <option value="" ${!evData.sceneId?'selected':''}>— 연결 안 함 —</option>
+          ${sceneOpts}
         </select></div>` : ''}
       <div class="full"><label class="label">관련 인물</label>
         ${chars.length===0
@@ -2070,6 +2109,7 @@ function saveChronicle(id) {
     place: document.getElementById('cr-place').value,
     importance: document.getElementById('cr-importance').value,
     chapterId: document.getElementById('cr-chapter')?.value || '',
+    sceneId: document.getElementById('cr-scene')?.value || '',
     sortKey,
     order: defaultOrder,
     chars: charsArr,
