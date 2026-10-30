@@ -29,7 +29,7 @@ function buildNarrativeTimeline(project, foreshadowIndex) {
   (project.chronicles || []).forEach((event, itemIndex) => {
     add(event.chapterId, 'chronicle', {
       title: event.title || '제목 없는 사건',
-      detail: event.time || '시점 미입력',
+      detail: `발생: ${event.time || '시점 미입력'}`,
       sub: event.place || '',
       source: 'chronicle', itemIndex
     });
@@ -94,7 +94,7 @@ function renderNarrativeTimeline() {
   if (!project) return;
   const { rows, unlinked } = buildNarrativeTimeline(project, buildForeshadowIndex());
   const laneDefs = [
-    { key: 'chronicle', label: '사건' },
+    { key: 'chronicle', label: '공개되는 사건' },
     { key: 'plot', label: '플롯 장면' },
     { key: 'psy', label: '심리 변화' },
     { key: 'foreshadow', label: '복선' }
@@ -121,7 +121,7 @@ function renderNarrativeTimeline() {
     <div class="nt-heading">
       <div>
         <div class="font-display" style="font-size:22px">서사 타임라인</div>
-        <p>회차별 사건·플롯·심리 변화·복선의 흐름을 함께 확인하세요. 항목을 누르면 원본 기록이 열립니다.</p>
+        <p>사건은 독자에게 공개되는 회차에 표시됩니다. 발생 시점은 카드에서 확인하세요. 항목을 누르면 원본 기록이 열립니다.</p>
       </div>
     </div>
     ${rows.length ? `<div class="nt-grid-head"><span>회차</span>${laneDefs.map(definition => `<span>${definition.label}</span>`).join('')}</div>
@@ -135,7 +135,7 @@ function renderNarrativeTimeline() {
       : `<div class="card empty-state"><div class="emoji">📖</div><p>회차를 만들면 서사 흐름을 확인할 수 있습니다.</p></div>`}
     ${anyUnlinked ? `<section class="nt-unlinked">
       <h3>회차에 연결되지 않은 기록</h3>
-      <p>사건·플롯·심리 단계는 원본에서 회차를 지정할 수 있습니다. 복선은 본문에 태그를 넣으면 회차가 연결됩니다.</p>
+      <p>사건은 공개 회차를, 플롯·심리 단계는 연결 회차를 원본에서 지정할 수 있습니다. 복선은 본문에 태그를 넣으면 회차가 연결됩니다.</p>
       <div class="nt-unlinked-grid">${laneDefs.map(definition => `<div>
         <h4>${definition.label} · ${unlinked[definition.key].length}</h4>
         ${unlinked[definition.key].length ? unlinked[definition.key].map(card).join('') : '<span class="nt-empty">—</span>'}

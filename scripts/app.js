@@ -9725,10 +9725,20 @@ function renderChronicle() {
   if (!p) return;
   if (!p.chronicles) p.chronicles = [];
 
-  // order 없는 항목 보정 — 현재 배열 순서대로 10 간격 부여
+  // 기존 수동 순서와 연대순 숫자를 유지하고, 연대순 미배치 사건만 뒤에 추가한다.
   let _orderFixed = false;
   p.chronicles.forEach((e, i) => {
     if (!e.order) { e.order = (i + 1) * 10; _orderFixed = true; }
+  });
+  let nextTimeOrder = p.chronicles.reduce((max, e) => {
+    const value = Number(e.sortKey);
+    return e.sortKey != null && Number.isFinite(value) ? Math.max(max, value) : max;
+  }, 0);
+  [...p.chronicles].sort((a,b) => (a.order||0) - (b.order||0)).forEach(e => {
+    if (e.sortKey == null || !Number.isFinite(Number(e.sortKey))) {
+      e.sortKey = nextTimeOrder += 10;
+      _orderFixed = true;
+    }
   });
   if (_orderFixed) autoSave();
 
@@ -9761,10 +9771,10 @@ function renderChronicle() {
       return (a.order||0) - (b.order||0);
     });
   } else if (sortMode === 'time') {
-    // 작중 연대순 → sortKey 오름차순, 없는 건 Infinity (맨 뒤). 동률은 수동 order 유지
+    // 작중 연대순 → 기존 숫자 순서와 드래그로 지정한 순서를 함께 사용한다.
     list = [...p.chronicles].sort((a,b) => {
-      const sa = (a.sortKey ?? Infinity);
-      const sb = (b.sortKey ?? Infinity);
+      const sa = Number(a.sortKey);
+      const sb = Number(b.sortKey);
       if (sa !== sb) return sa - sb;
       return (a.order||0) - (b.order||0);
     });
@@ -9808,7 +9818,7 @@ function renderChronicle() {
   const selectStyle = 'padding:5px 10px;border-radius:8px;font-size:12px;font-weight:600;background:var(--paper);color:var(--ink);font-family:\'Noto Sans KR\',sans-serif;cursor:pointer;outline:none;';
 
   const hasAnyFilter = impFilter!=='전체' || charFilter!=='전체' || placeFilter!=='전체' || chapterFilter!=='전체' || search;
-  const canDrag = sortMode === 'manual' && !hasAnyFilter && list.length >= 2;
+  const canDrag = sortMode !== 'chapter' && !hasAnyFilter && list.length >= 2;
 
   document.getElementById('main').innerHTML = `
     <div style="max-width:800px;margin:0 auto">
@@ -9842,7 +9852,7 @@ function renderChronicle() {
           <button onclick="window._crSortMode='time';renderChronicle()"
             style="padding:5px 10px;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:'Noto Sans KR',sans-serif;border-left:1.5px solid var(--border);
               background:${sortMode==='time'?'var(--gold)':'transparent'};color:${sortMode==='time'?'#fff':'var(--muted)'}"
-            title="작중 연대순 숫자로 정렬">⏳ 연대순</button>
+            title="작중 사건 순서 · 드래그로 변경">⏳ 연대순</button>
           <button onclick="window._crSortMode='chapter';renderChronicle()"
             style="padding:5px 10px;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:'Noto Sans KR',sans-serif;border-left:1.5px solid var(--border);
               background:${sortMode==='chapter'?'var(--gold)':'transparent'};color:${sortMode==='chapter'?'#fff':'var(--muted)'}"
@@ -9870,8 +9880,8 @@ function renderChronicle() {
         ${(usedChapters.length > 0 || hasUnlinked) ? `
         <select style="${selectStyle}border:1.5px solid ${chapterFilter!=='전체'?'var(--teal)':'var(--border)'};color:${chapterFilter!=='전체'?'var(--teal)':'var(--ink)'}"
           onchange="window._crChapterFilter=this.value;renderChronicle()">
-          <option value="전체" ${chapterFilter==='전체'?'selected':''}>📖 회차 전체</option>
-          ${hasUnlinked ? `<option value="__none__" ${chapterFilter==='__none__'?'selected':''}>— 연결 없음</option>` : ''}
+          <option value="전체" ${chapterFilter==='전체'?'selected':''}>📖 공개 회차 전체</option>
+          ${hasUnlinked ? `<option value="__none__" ${chapterFilter==='__none__'?'selected':''}>— 공개 회차 없음</option>` : ''}
           ${usedChapters.map(c=>`<option value="${esc(c.id)}" ${chapterFilter===c.id?'selected':''}>${esc(c.title||'(제목 없음)')}</option>`).join('')}
         </select>` : ''}
         ${hasAnyFilter ? `
@@ -9881,7 +9891,7 @@ function renderChronicle() {
         </button>` : ''}
         <span style="margin-left:auto;font-size:11px;color:var(--muted)">
           ${hasAnyFilter ? `${filtered.length} / ${list.length}건` : `${list.length}건`}
-          ${canDrag ? ' · ⠿ 드래그로 정렬' : (sortMode!=='manual' && list.length>=2 ? ` · ${sortMode==='time'?'연대순':'회차순'} (드래그 비활성)` : '')}
+          ${canDrag ? ` · ⠿ 드래그로 ${sortMode==='time'?'사건 발생':'수동'} 순서 변경` : (sortMode==='chapter' && list.length>=2 ? ' · 회차순 (드래그 비활성)' : '')}
         </span>
       </div>` : ''}
 
@@ -9912,15 +9922,14 @@ function renderChronicle() {
                     <span class="ev-drag-handle" data-ev-id="${evIdEsc}"
                       style="color:var(--border);font-size:16px;${canDrag?'cursor:grab':'cursor:not-allowed;opacity:.35'};flex-shrink:0;
                         touch-action:none;user-select:none;padding:2px 3px;margin-top:2px;line-height:1"
-                      title="${canDrag?'드래그하여 순서 변경':(sortMode!=='manual'?'수동 모드에서만 드래그할 수 있어요':'필터를 해제하면 드래그할 수 있어요')}">⠿</span>
+                      title="${canDrag?'드래그하여 순서 변경':(sortMode==='chapter'?'수동 또는 연대순 보기에서 드래그할 수 있어요':'필터를 해제하면 드래그할 수 있어요')}">⠿</span>
                     <div style="flex:1;min-width:0">
                       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
                         <span style="font-size:13px;font-weight:700;color:var(--gold)">${esc(ev.time||'')}</span>
-                        ${ev.sortKey !== undefined ? `<span style="font-size:11px;color:${sortMode==='time'?'var(--gold)':'var(--muted)'};${sortMode==='time'?'font-weight:700':''}">⏳ ${ev.sortKey}</span>` : ''}
                         <span style="font-size:11px;color:${IMP_COLOR[imp]};font-weight:700">${imp}</span>
                         ${linkedCh ? `<button onclick="crJumpToChapter('${esc(linkedCh.id)}')"
                           style="font-size:11px;color:var(--teal);background:var(--teal-light);border:none;padding:2px 8px;border-radius:10px;cursor:pointer;font-weight:600;font-family:'Noto Sans KR',sans-serif"
-                          title="이 회차로 이동">📖 ${esc(linkedCh.title||'(제목 없음)')}</button>` : ''}
+                          title="공개 회차로 이동">📖 공개: ${esc(linkedCh.title||'(제목 없음)')}</button>` : ''}
                         ${linkedScene ? `<button onclick="crJumpToPlotScene('${esc(linkedScene.scene.id)}')"
                           style="font-size:11px;color:var(--gold);background:var(--gold-light);border:none;padding:2px 8px;border-radius:10px;cursor:pointer;font-weight:600;font-family:'Noto Sans KR',sans-serif"
                           title="연결된 플롯 장면 열기">🗺️ ${esc(linkedScene.scene.title||'(제목 없음)')}</button>` : ''}
@@ -9985,15 +9994,11 @@ function showChronicleModal(id) {
   showModal(`
     <div class="modal-title">${isEdit ? '사건 수정' : '사건 추가'}</div>
     <div class="form-grid">
-       <div><label class="label">작품 내 시점 *
-         <span style="font-size:11px;color:var(--muted);font-weight:500">— 화면에 표시할 시기</span>
+      <div class="full"><label class="label">사건 발생 시점 *
+        <span style="font-size:11px;color:var(--muted);font-weight:500">— 작품 안에서 실제로 일어난 때</span>
       </label>
         <input id="cr-time" value="${esc(evData.time||'')}" placeholder="예: 즉위 5년 봄, D+3일"></div>
-      <div><label class="label">작중 연대순
-         <span style="font-size:11px;color:var(--muted);font-weight:500">— 연대순 보기용 숫자 (선택)</span>
-      </label>
-         <input id="cr-sortkey" type="number" step="any" value="${evData.sortKey ?? ''}" placeholder="예: 1, 2, 2.5">
-         <small style="display:block;margin-top:4px;color:var(--muted)">비워두면 연대순 보기의 맨 뒤에 표시됩니다. 수동 보기의 순서는 드래그로 바꿀 수 있어요.</small></div>
+      <div class="full" style="font-size:11px;color:var(--muted)">발생 순서는 저장 후 ⏳ 연대순 보기에서 사건을 드래그해 조정할 수 있어요.</div>
       <div class="full"><label class="label">사건 제목 *</label>
         <input id="cr-title" value="${esc(evData.title||'')}" placeholder="사건을 한 줄로 요약"></div>
       <div class="full"><label class="label">사건 내용</label>
@@ -10003,8 +10008,8 @@ function showChronicleModal(id) {
       <div><label class="label">중요도</label>
         <select id="cr-importance">${IMPORTANCE.map(s=>`<option value="${s}" ${evData.importance===s?'selected':''}>${s}</option>`).join('')}</select></div>
       ${chapters.length > 0 ? `
-      <div class="full"><label class="label">연결된 회차
-        <span style="font-size:11px;color:var(--muted);font-weight:500">— 본편에서 이 사건이 등장하는 회차 (선택사항)</span>
+      <div class="full"><label class="label">독자에게 공개되는 회차
+        <span style="font-size:11px;color:var(--muted);font-weight:500">— 발생 시점과 달라도 됩니다 (선택사항)</span>
       </label>
         <select id="cr-chapter">
           <option value="" ${!evData.chapterId?'selected':''}>— 연결 안 함 —</option>
@@ -10070,10 +10075,12 @@ function saveChronicle(id) {
     ? (p.chronicles[existingIdx].order || 0)
     : (p.chronicles.reduce((m, e) => Math.max(m, e.order||0), 0) + 10);
 
-  // sortKey — 빈 값은 undefined, 아니면 숫자 파싱
-  const sortKeyRaw = document.getElementById('cr-sortkey')?.value?.trim() ?? '';
-  const sortKeyNum = sortKeyRaw === '' ? undefined : parseFloat(sortKeyRaw);
-  const sortKey = (sortKeyNum !== undefined && !isNaN(sortKeyNum)) ? sortKeyNum : undefined;
+  const sortKey = isEdit
+    ? p.chronicles[existingIdx].sortKey
+    : p.chronicles.reduce((max, e) => {
+        const value = Number(e.sortKey);
+        return e.sortKey != null && Number.isFinite(value) ? Math.max(max, value) : max;
+      }, 0) + 10;
 
   const ev = {
     id: isEdit ? p.chronicles[existingIdx].id : uid(),
@@ -10087,8 +10094,6 @@ function saveChronicle(id) {
     order: defaultOrder,
     chars: charsArr,
   };
-  // sortKey undefined 면 객체에서 제거 (깔끔한 직렬화)
-  if (sortKey === undefined) delete ev.sortKey;
   if (isEdit) p.chronicles[existingIdx] = ev;
   else p.chronicles.push(ev);
   autoSave(); closeModal(); renderChronicle();
@@ -10151,6 +10156,7 @@ function evDragInit(handle, x, y) {
 
   _evDrag = {
     evId,
+    mode: window._crSortMode,
     row,
     ghost,
     offsetX: x - rect.left - 24,
@@ -10212,7 +10218,7 @@ function evMouseEnd() {
 
 function evDragCommit() {
   if (!_evDrag) return;
-  const { evId, row, ghost, dropTarget } = _evDrag;
+  const { evId, row, ghost, dropTarget, mode } = _evDrag;
   _evDrag = null;
 
   ghost.remove();
@@ -10239,10 +10245,13 @@ function evDragCommit() {
       if (draggedEv) reordered.push(draggedEv);
     }
   }
-  // order 재할당 (10 간격으로, 나중에 삽입 여유 확보)
-  reordered.forEach((ev, i) => { ev.order = (i + 1) * 10; });
-  // p.chronicles 배열 자체도 동일 순서로 재배치 (indexOf 기반 편집이 정상 동작하려면)
-  p.chronicles = reordered;
+  // 두 정렬은 독립적이다. 연대순을 바꿔도 수동 순서는 유지한다.
+  if (mode === 'time') {
+    reordered.forEach((ev, i) => { ev.sortKey = (i + 1) * 10; });
+  } else {
+    reordered.forEach((ev, i) => { ev.order = (i + 1) * 10; });
+    p.chronicles = reordered;
+  }
   autoSave();
   renderChronicle();
 }
@@ -12009,7 +12018,7 @@ function buildNarrativeTimeline(project, foreshadowIndex) {
   (project.chronicles || []).forEach((event, itemIndex) => {
     add(event.chapterId, 'chronicle', {
       title: event.title || '제목 없는 사건',
-      detail: event.time || '시점 미입력',
+      detail: `발생: ${event.time || '시점 미입력'}`,
       sub: event.place || '',
       source: 'chronicle', itemIndex
     });
@@ -12074,7 +12083,7 @@ function renderNarrativeTimeline() {
   if (!project) return;
   const { rows, unlinked } = buildNarrativeTimeline(project, buildForeshadowIndex());
   const laneDefs = [
-    { key: 'chronicle', label: '사건' },
+    { key: 'chronicle', label: '공개되는 사건' },
     { key: 'plot', label: '플롯 장면' },
     { key: 'psy', label: '심리 변화' },
     { key: 'foreshadow', label: '복선' }
@@ -12101,7 +12110,7 @@ function renderNarrativeTimeline() {
     <div class="nt-heading">
       <div>
         <div class="font-display" style="font-size:22px">서사 타임라인</div>
-        <p>회차별 사건·플롯·심리 변화·복선의 흐름을 함께 확인하세요. 항목을 누르면 원본 기록이 열립니다.</p>
+        <p>사건은 독자에게 공개되는 회차에 표시됩니다. 발생 시점은 카드에서 확인하세요. 항목을 누르면 원본 기록이 열립니다.</p>
       </div>
     </div>
     ${rows.length ? `<div class="nt-grid-head"><span>회차</span>${laneDefs.map(definition => `<span>${definition.label}</span>`).join('')}</div>
@@ -12115,7 +12124,7 @@ function renderNarrativeTimeline() {
       : `<div class="card empty-state"><div class="emoji">📖</div><p>회차를 만들면 서사 흐름을 확인할 수 있습니다.</p></div>`}
     ${anyUnlinked ? `<section class="nt-unlinked">
       <h3>회차에 연결되지 않은 기록</h3>
-      <p>사건·플롯·심리 단계는 원본에서 회차를 지정할 수 있습니다. 복선은 본문에 태그를 넣으면 회차가 연결됩니다.</p>
+      <p>사건은 공개 회차를, 플롯·심리 단계는 연결 회차를 원본에서 지정할 수 있습니다. 복선은 본문에 태그를 넣으면 회차가 연결됩니다.</p>
       <div class="nt-unlinked-grid">${laneDefs.map(definition => `<div>
         <h4>${definition.label} · ${unlinked[definition.key].length}</h4>
         ${unlinked[definition.key].length ? unlinked[definition.key].map(card).join('') : '<span class="nt-empty">—</span>'}

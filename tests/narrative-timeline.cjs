@@ -56,7 +56,7 @@ assert.deepEqual(Array.from(data.rows[0].lanes.plot, item => item.title), ['교�
 assert.equal(data.rows[0].lanes.plot[0].detail, '1번째 · 조연');
 assert.equal(data.rows[0].lanes.foreshadow[0].detail, '🌱 첫 등장');
 assert.equal(data.rows[0].lanes.chronicle[0].title, '밀약');
-assert.equal(data.rows[0].lanes.chronicle[0].detail, '봄');
+assert.equal(data.rows[0].lanes.chronicle[0].detail, '발생: 봄');
 assert.equal(data.rows[1].lanes.psy[0].detail, '주인공');
 assert.equal(data.rows[1].lanes.foreshadow[0].detail, '💬 중간 언급');
 assert.equal(data.rows[2].lanes.foreshadow[0].detail, '✅ 회수');

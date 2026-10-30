@@ -19,8 +19,9 @@ const calls = [];
 const fields = {
   'cr-time': '여름', 'cr-title': '새 사건', 'cr-desc': '설명',
   'cr-place': '도시', 'cr-importance': '★ 일반',
-  'cr-chapter': 'c1', 'cr-scene': 's1', 'cr-sortkey': '', 'cr-chars': ''
+  'cr-chapter': 'c1', 'cr-scene': 's1', 'cr-chars': ''
 };
+const main = { innerHTML: '' };
 const context = vm.createContext({
   getProject: () => project,
   esc: value => String(value),
@@ -31,22 +32,29 @@ const context = vm.createContext({
   navigate: tab => calls.push(['navigate', tab]),
   showSceneModal: (arcIndex, sceneIndex) => calls.push(['scene', arcIndex, sceneIndex]),
   setTimeout() {},
+  window: { _crSortMode: 'time' },
   document: {
-    getElementById: id => ({ value: fields[id] }),
+    getElementById: id => id === 'main' ? main : ({ value: fields[id] }),
     querySelectorAll: () => []
   }
 });
 vm.runInContext(source.slice(start, end), context);
+context.renderChronicle();
+assert.equal(project.chronicles[0].sortKey, 10);
+assert.match(main.innerHTML, /작중 사건 순서 · 드래그로 변경/);
 context.renderChronicle = () => {};
 
 context.showChronicleModal('e1');
 assert.match(modal, /연결된 플롯 장면/);
 assert.match(modal, /첫 아크 · 첫 장면/);
-assert.match(modal, /연대순 보기용 숫자/);
+assert.match(modal, /사건 발생 시점/);
+assert.match(modal, /독자에게 공개되는 회차/);
+assert.doesNotMatch(modal, /cr-sortkey/);
 context.saveChronicle('');
 assert.equal(project.chronicles[1].sceneId, 's1');
 assert.equal(project.chronicles[1].chapterId, 'c1');
-assert.equal(saved, 1);
+assert.equal(project.chronicles[1].sortKey, 20);
+assert.equal(saved, 2);
 context.crJumpToPlotScene('s1');
 assert.deepEqual(calls, [['navigate', 'plot'], ['scene', 0, 0]]);
 
