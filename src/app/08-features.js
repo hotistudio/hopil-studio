@@ -188,35 +188,46 @@ function showSavedBanner(success=true) {
 // ═══════════════════════════════════════════════════════════
 // 컬러 테마
 const COLOR_THEMES = [
-  { id:'yellow', label:'노랑', color:'#c4922a' },
-  { id:'red',    label:'빨강', color:'#c43a3a' },
-  { id:'orange', label:'주황', color:'#c4622a' },
-  { id:'green',  label:'초록', color:'#2a7a3a' },
-  { id:'blue',   label:'파랑', color:'#2a52c4' },
-  { id:'navy',   label:'남색', color:'#2a2a8a' },
-  { id:'purple', label:'보라', color:'#7a2ac4' },
+  { id:'yellow', label:'노랑', color:'#d97706' },
+  { id:'red',    label:'빨강', color:'#dc2626' },
+  { id:'orange', label:'주황', color:'#ea580c' },
+  { id:'green',  label:'초록', color:'#16a34a' },
+  { id:'blue',   label:'파랑', color:'#2563eb' },
+  { id:'navy',   label:'남색', color:'#1e40af' },
+  { id:'purple', label:'보라', color:'#7c3aed' },
 ];
+const PAPER_ACCENTS = { yellow:'#9a4d00', red:'#b91c1c', orange:'#a43d12', green:'#3f6653', blue:'#1d4ed8', navy:'#1e40af', purple:'#7c3aed' };
 
 function applyColorTheme(id) {
   document.documentElement.setAttribute('data-color-theme', id);
   localStorage.setItem('hopil_studio_color_theme', id);
   // 피커 닫기
   document.getElementById('theme-picker-popup')?.remove();
+  document.getElementById('btn-theme')?.setAttribute('aria-expanded', 'false');
 }
 
 function toggleThemePicker() {
   const existing = document.getElementById('theme-picker-popup');
-  if (existing) { existing.remove(); return; }
+  if (existing) { existing.remove(); document.getElementById('btn-theme')?.setAttribute('aria-expanded', 'false'); return; }
   const btn = document.getElementById('btn-theme');
   const rect = btn.getBoundingClientRect();
-  const cur = localStorage.getItem('hopil_studio_color_theme') || 'yellow';
+  const mode = document.documentElement.getAttribute('data-theme') || 'light';
+  const cur = document.documentElement.getAttribute('data-color-theme') || 'yellow';
   const popup = document.createElement('div');
   popup.id = 'theme-picker-popup';
   popup.style.cssText = `position:fixed;top:${rect.bottom+6}px;right:${window.innerWidth-rect.right}px;
     background:var(--paper);border:1.5px solid var(--border);border-radius:14px;
-    padding:14px 16px;z-index:9999;box-shadow:0 8px 32px var(--shadow);min-width:200px`;
+    padding:14px 16px;z-index:9999;box-shadow:0 8px 32px var(--shadow);min-width:200px;
+    max-height:calc(100dvh - ${rect.bottom+14}px);overflow-y:auto`;
   popup.innerHTML = `
-    <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:12px;letter-spacing:.5px">테마 색상</div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;letter-spacing:.5px">화면 모드</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+      ${[['light','라이트'],['paper','종이'],['dark','다크']].map(([id,label]) => `
+        <button class="display-mode-option${mode===id?' active':''}" onclick="applyDisplayMode('${id}')" aria-pressed="${mode===id}">
+          ${label} 모드 ${mode===id?'<span aria-hidden="true">✓</span>':''}
+        </button>`).join('')}
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;letter-spacing:.5px">강조 색상</div>
     <div style="display:flex;flex-direction:column;gap:8px">
       ${COLOR_THEMES.map(t => `
         <button onclick="applyColorTheme('${t.id}')"
@@ -226,18 +237,21 @@ function toggleThemePicker() {
             cursor:pointer;font-family:'Noto Sans KR',sans-serif;
             font-size:13px;font-weight:${cur===t.id?'700':'400'};color:var(--ink);
             transition:all .15s;text-align:left;width:100%">
-          <span style="width:22px;height:22px;border-radius:50%;background:${t.color};
+          <span style="width:22px;height:22px;border-radius:50%;background:${mode==='paper'?PAPER_ACCENTS[t.id]:t.color};
             display:inline-block;flex-shrink:0;border:2px solid rgba(0,0,0,.08)"></span>
           ${t.label}
           ${cur===t.id?'<span style="margin-left:auto;color:var(--gold)">✓</span>':''}
         </button>`).join('')}
     </div>`;
   document.body.appendChild(popup);
+  btn.setAttribute('aria-expanded', 'true');
   // 외부 클릭 시 닫기
   setTimeout(() => {
     document.addEventListener('click', function handler(e) {
+      if (!popup.isConnected) { document.removeEventListener('click', handler); return; }
       if (!popup.contains(e.target) && e.target !== btn) {
         popup.remove();
+        btn.setAttribute('aria-expanded', 'false');
         document.removeEventListener('click', handler);
       }
     });
@@ -245,29 +259,39 @@ function toggleThemePicker() {
 }
 
 function initColorTheme() {
-  const saved = localStorage.getItem('hopil_studio_color_theme') || 'yellow';
+  const saved = localStorage.getItem('hopil_studio_color_theme') || (document.documentElement.getAttribute('data-theme') === 'paper' ? 'green' : 'yellow');
   document.documentElement.setAttribute('data-color-theme', saved);
 }
 
-// 다크모드
+// 화면 모드: 기존 다크모드 설정을 새 3단계 설정으로 이관한다.
 // ═══════════════════════════════════════════════════════════
 function initDarkMode() {
-  const saved = localStorage.getItem('hopil_studio_darkmode');
+  const savedMode = localStorage.getItem('hopil_studio_display_mode');
+  const savedDark = localStorage.getItem('hopil_studio_darkmode');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const isDark = saved !== null ? saved === 'true' : prefersDark;
-  applyDarkMode(isDark);
+  const mode = ['light','paper','dark'].includes(savedMode) ? savedMode : (savedDark !== null ? (savedDark === 'true' ? 'dark' : 'light') : (prefersDark ? 'dark' : 'light'));
+  applyDisplayMode(mode);
 }
 
-function applyDarkMode(isDark) {
-  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+function applyDisplayMode(mode) {
+  if (!['light','paper','dark'].includes(mode)) return;
+  document.documentElement.setAttribute('data-theme', mode);
+  document.documentElement.setAttribute('data-color-theme', localStorage.getItem('hopil_studio_color_theme') || (mode === 'paper' ? 'green' : 'yellow'));
   const btn = document.getElementById('btn-darkmode');
   if (btn) {
-    btn.querySelector('use')?.setAttribute('href', isDark ? '#icon-sun' : '#icon-moon');
-    const label = isDark ? '라이트모드 전환' : '다크모드 전환';
+    btn.querySelector('use')?.setAttribute('href', mode === 'dark' ? '#icon-sun' : '#icon-moon');
+    const label = mode === 'dark' ? '라이트모드 전환' : '다크모드 전환';
     btn.setAttribute('aria-label', label);
     btn.title = label;
   }
-  localStorage.setItem('hopil_studio_darkmode', isDark);
+  localStorage.setItem('hopil_studio_display_mode', mode);
+  localStorage.setItem('hopil_studio_darkmode', mode === 'dark');
+  document.getElementById('theme-picker-popup')?.remove();
+  document.getElementById('btn-theme')?.setAttribute('aria-expanded', 'false');
+}
+
+function applyDarkMode(isDark) {
+  applyDisplayMode(isDark ? 'dark' : 'light');
 }
 
 function toggleDarkMode() {

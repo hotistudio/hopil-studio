@@ -38,6 +38,26 @@
 /* 보라 */
 [data-color-theme="purple"]{ --gold:#7c3aed; --gold2:#6d28d9; --gold-light:#faf5ff; --teal:#4c1d95; --teal2:#5b21b6; --teal-light:#faf5ff; }
 
+/* 오래 읽고 쓰는 화면을 위한 따뜻한 종이 모드 */
+[data-theme="paper"]{
+  --ink:#2f342f; --paper:#f5f1e8; --cream:#ece7dd; --white:#fffcf6;
+  --teal:#3f6653; --teal2:#315443; --teal-light:#e6eee7;
+  --muted:#5f675f; --border:#d9d3c7; --shadow:rgba(47,52,47,.06);
+  --header-bg:#fffcf6; --header-fg:#2f342f;
+  --header-fg-soft:#5f675f; --header-btn-bg:rgba(47,52,47,.06);
+  --header-btn-bg-hover:rgba(47,52,47,.12); --header-border:#d9d3c7;
+}
+[data-theme="paper"][data-color-theme="yellow"]{--gold:#9a4d00;--gold2:#7b3e00;--gold-light:#f8edd8;--teal:#9a4d00;--teal2:#7b3e00}
+[data-theme="paper"][data-color-theme="red"]{--gold:#b91c1c;--gold2:#991b1b;--gold-light:#fce8e6;--teal:#b91c1c;--teal2:#991b1b}
+[data-theme="paper"][data-color-theme="orange"]{--gold:#a43d12;--gold2:#84310f;--gold-light:#f9e9de;--teal:#a43d12;--teal2:#84310f}
+[data-theme="paper"][data-color-theme="green"]{
+  --gold:#3f6653; --gold2:#315443; --gold-light:#e6eee7;
+  --teal:#3f6653; --teal2:#315443; --teal-light:#e6eee7;
+}
+[data-theme="paper"][data-color-theme="blue"]{--gold:#1d4ed8;--gold2:#1e40af;--gold-light:#e8efff;--teal:#1d4ed8;--teal2:#1e40af}
+[data-theme="paper"][data-color-theme="navy"]{--gold:#1e40af;--gold2:#1e3a8a;--gold-light:#e9edfc;--teal:#1e40af;--teal2:#1e3a8a}
+[data-theme="paper"][data-color-theme="purple"]{--gold:#7c3aed;--gold2:#6d28d9;--gold-light:#f0e9ff;--teal:#7c3aed;--teal2:#6d28d9}
+
 /* ─── 다크모드 ─────────────────────────────────────────────────── */
 [data-theme="dark"]{
   --ink:#e5e5e5; --paper:#0a0a0a; --cream:#171717; --white:#171717;
@@ -175,6 +195,9 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
   font-family:'Pretendard Variable','Pretendard','Noto Sans KR',sans-serif;
   transition:background .15s;white-space:nowrap}
 .header-btn:hover,.header-btn:active{background:var(--header-btn-bg-hover)}
+.display-mode-option{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:9px 10px;background:transparent;color:var(--ink);border:1px solid var(--border);text-align:left;font-size:13px}
+.display-mode-option:hover{background:var(--cream)}
+.display-mode-option.active{background:var(--gold-light);border-color:var(--gold);color:var(--gold);font-weight:700}
 .header-icon-btn{width:36px;height:36px;min-width:36px;padding:0;justify-content:center}
 .header-btn .ui-icon{width:16px;height:16px}
 .header-btn.gold{background:var(--gold);color:var(--paper)}
