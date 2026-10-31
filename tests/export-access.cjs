@@ -27,7 +27,7 @@ vm.runInContext(section(editor, 'function renderEditorContent(', 'const SPLIT_WI
 
 context.renderManuscript();
 assert.match(main.innerHTML, /onclick="showExportModal\(\)"[^>]*>📤 원고 내보내기/);
-assert.match(context.renderEditorContent(project.chapters[0]), /onclick="showChExportMenu\('ch-1'\)"[^>]*>📤 내보내기/);
+assert.match(context.renderEditorContent(project.chapters[0]), /onclick="showChExportMenu\('ch-1'\)"[^>]*>.*내보내기<\/button>/);
 context.showExportModal();
 assert.match(modal, /한글 파일 \(HWPX\) 저장/);
 assert(modal.indexOf('한글 파일 (HWPX) 저장') < modal.indexOf('📋 클립보드 복사'));

@@ -261,7 +261,12 @@ function initDarkMode() {
 function applyDarkMode(isDark) {
   document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
   const btn = document.getElementById('btn-darkmode');
-  if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+  if (btn) {
+    btn.querySelector('use')?.setAttribute('href', isDark ? '#icon-sun' : '#icon-moon');
+    const label = isDark ? '라이트모드 전환' : '다크모드 전환';
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  }
   localStorage.setItem('hopil_studio_darkmode', isDark);
 }
 

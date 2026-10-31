@@ -4,13 +4,14 @@
   // ─── CSS 주입 ───────────────────────────────────────────────────
   const style = document.createElement('style');
   style.textContent = `
-    /* 모바일 저장 버튼 강조 */
+    /* 모바일 헤더 버튼 크기와 저장 상태 표시 */
     @media (max-width: 520px) {
       #btn-save-project {
-        padding: 7px 11px !important;
-        font-size: 18px !important;
+        min-width: 36px;
+        min-height: 36px;
+        padding: 0 !important;
         background: var(--gold) !important;
-        box-shadow: 0 2px 6px rgba(196, 146, 42, .35);
+        box-shadow: 0 2px 6px var(--shadow);
         position: relative;
       }
       #btn-save-project:active {
@@ -20,15 +21,10 @@
       #save-indicator {
         display: none !important;
       }
-      /* 테마 색상 버튼 유지 — 크기만 조정 */
-      #btn-theme {
-        font-size: 13px !important;
-        padding: 5px 6px !important;
-      }
-      /* 다크모드 버튼은 작게 유지 */
-      #btn-darkmode {
-        font-size: 13px !important;
-        padding: 5px 6px !important;
+      #btn-theme, #btn-darkmode {
+        min-width: 36px;
+        min-height: 36px;
+        padding: 0 !important;
       }
       /* 파일 상태 🔗 아이콘도 작게 */
       #file-status {

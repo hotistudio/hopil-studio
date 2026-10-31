@@ -14,6 +14,7 @@
   --rust:#dc2626; --rust-light:#fef2f2;
   --muted:#737373; --border:#e5e5e5; --shadow:rgba(0,0,0,.04);
   --sidebar:240px; --header:52px;
+  --control-radius:8px; --card-radius:12px; --control-height:36px;
   /* 헤더 전용 (라이트모드: 흰 배경 + 잉크 텍스트) */
   --header-bg:#ffffff; --header-fg:#0a0a0a;
   --header-fg-soft:rgba(10,10,10,.6);
@@ -96,6 +97,9 @@ html,body{height:100%;overflow:hidden;background:var(--paper);color:var(--ink);
   font-size:14px;-webkit-tap-highlight-color:transparent;
   font-feature-settings:'ss06','ss07';letter-spacing:-0.01em}
 ::-webkit-scrollbar{width:4px;height:4px}
+.icon-sprite{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}
+.ui-icon{display:inline-block;width:18px;height:18px;flex:none;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+button:focus-visible,.nav-item:focus-visible,.split-tab:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 ::-webkit-scrollbar-track{background:var(--cream)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 .split-panel-tabs::-webkit-scrollbar{height:8px}
@@ -112,7 +116,7 @@ html,body{height:100%;overflow:hidden;background:var(--paper);color:var(--ink);
 input,textarea,select{
   font-family:'Noto Sans KR',sans-serif;
   background:var(--white);color:var(--ink);
-  border:1.5px solid var(--border);border-radius:8px;
+  border:1.5px solid var(--border);border-radius:var(--control-radius);
   padding:9px 13px;font-size:14px;outline:none;
   transition:border-color .2s,box-shadow .2s;width:100%;
   -webkit-appearance:none;appearance:none;
@@ -124,17 +128,18 @@ input[type="checkbox"],input[type="radio"]{
 }
 input[type="radio"]{-webkit-appearance:radio;appearance:radio}
 input:focus,textarea:focus,select:focus{
-  border-color:var(--gold);box-shadow:0 0 0 3px rgba(196,146,42,.15)}
+  border-color:var(--gold);box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 18%,transparent)}
 textarea{resize:vertical;line-height:1.8;min-height:80px}
 select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a6e5f' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 12px center;padding-right:36px;cursor:pointer}
 
 /* ═══ BUTTONS ═══════════════════════════════════════════════ */
-button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-radius:8px;transition:all .18s;-webkit-tap-highlight-color:transparent}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;font-size:13px;font-weight:600;white-space:nowrap}
+button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-radius:var(--control-radius);transition:background .18s,color .18s,border-color .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:var(--control-height);padding:8px 16px;font-size:13px;font-weight:600;white-space:nowrap}
 .btn-sm{padding:6px 12px;font-size:12px;gap:4px}
-.btn-gold{background:var(--gold);color:#fff}
-.btn-gold:hover,.btn-gold:active{background:var(--gold2);color:var(--ink);box-shadow:0 4px 14px rgba(196,146,42,.3)}
+.btn-sm .ui-icon,.reader-style-control .ui-icon{width:15px;height:15px}
+.btn-gold{background:var(--gold);color:var(--paper)}
+.btn-gold:hover,.btn-gold:active{background:var(--gold2);color:var(--paper);box-shadow:0 3px 10px var(--shadow)}
 .btn-teal{background:var(--teal);color:#fff}
 .btn-teal:hover,.btn-teal:active{background:var(--teal2)}
 .btn-outline{background:transparent;color:var(--muted);border:1.5px solid var(--border)}
@@ -170,6 +175,8 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
   font-family:'Pretendard Variable','Pretendard','Noto Sans KR',sans-serif;
   transition:background .15s;white-space:nowrap}
 .header-btn:hover,.header-btn:active{background:var(--header-btn-bg-hover)}
+.header-icon-btn{width:36px;height:36px;min-width:36px;padding:0;justify-content:center}
+.header-btn .ui-icon{width:16px;height:16px}
 .header-btn.gold{background:var(--gold);color:var(--paper)}
 .header-btn.gold:hover{background:var(--gold2);color:var(--paper)}
 /* 메뉴 토글 SVG의 하드코딩 흰색을 헤더 색으로 강제 — 라이트모드 가시성 */
@@ -201,6 +208,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 .nav-item.active{background:var(--gold-light);color:var(--gold);font-weight:700;
   border-left:3px solid var(--gold)}
 .nav-item svg{flex-shrink:0}
+.nav-item svg{width:18px;height:18px}
 .nav-badge{margin-left:auto;background:var(--cream);color:var(--muted);
   border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700}
 .sidebar-footer{padding:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
@@ -213,7 +221,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 #sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:150}
 
 /* ═══ CARDS & COMPONENTS ═══════════════════════════════════ */
-.card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:20px;box-shadow:0 2px 8px var(--shadow)}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--card-radius);padding:20px;box-shadow:0 2px 8px var(--shadow)}
 .card-sm{padding:14px 16px}
 .label{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.3px;display:block}
 .tag{display:inline-flex;align-items:center;background:var(--cream);border:1px solid var(--border);
@@ -610,14 +618,16 @@ html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacit
 .split-panel-tabs {
   display:flex; gap:2px; padding:8px 10px 0;
   border-bottom:1px solid var(--border); background:var(--cream);
-  flex-shrink:0;
+  flex-shrink:0;overflow-x:auto;scrollbar-width:thin;
 }
 .split-tab {
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;
   padding:6px 12px; border-radius:8px 8px 0 0; font-size:12px;
   font-weight:700; cursor:pointer; border:none; background:transparent;
   color:var(--muted); font-family:'Noto Sans KR',sans-serif;
   transition:all .15s; white-space:nowrap;
 }
+.split-tab .ui-icon{width:15px;height:15px}
 .split-tab.active {
   background:var(--white); color:var(--gold);
   border:1.5px solid var(--border); border-bottom:1.5px solid var(--white);
@@ -697,6 +707,8 @@ html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacit
   color:var(--muted);font-family:'Noto Sans KR',sans-serif;
 }
 #focus-exit-btn:hover { border-color:var(--gold);color:var(--gold); }
+#focus-toolbar .reader-style-control,#focus-ref-btn,#focus-exit-btn,#focus-toolbar .typewriter-toggle,#focus-toolbar button[onclick="togglePomodoro()"]{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+#focus-toolbar .ui-icon{width:15px;height:15px}
 #focus-toolbar .typewriter-toggle{background:transparent;border:1.5px solid var(--border);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--muted)}
 #focus-toolbar .typewriter-toggle[aria-pressed="true"]{background:var(--gold-light);color:var(--gold);border-color:var(--gold)}
 
@@ -706,10 +718,9 @@ html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacit
   #header-title { font-size:13px; letter-spacing:0; }
   #header-title span { font-size:8px; }
   .header-btn { padding:5px 8px; font-size:11px; }
-  #btn-darkmode { padding:4px 7px; font-size:14px; }
+  #btn-darkmode { padding:0; }
   .btn-text { display:none; }
-  #btn-save-project { padding:4px 7px; font-size:14px; }
-  #btn-load-project { padding:4px 7px; font-size:14px; }
+  #btn-save-project,#btn-load-project{min-width:36px;min-height:36px;padding:0;justify-content:center}
 }
 @media(max-width:768px){
   :root{--sidebar:0px;--header:50px}
@@ -942,6 +953,12 @@ html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacit
   #focus-editor{height:100%;min-height:0}
 }
 @media(max-width:520px){
+  #main{padding:12px}
+  .card{padding:16px}
+  .card-sm{padding:12px 14px}
+  .form-grid{gap:12px}
+  input,textarea,select{font-size:16px}
+  .split-tab{padding:6px 10px}
   .editor-toolbar .btn{padding:6px 8px}
   .editor-toolbar-spacer{flex-basis:100%}
   .editor-more-actions{right:-2px}

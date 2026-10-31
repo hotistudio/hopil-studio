@@ -3510,6 +3510,7 @@ function renderChapters() {
 }
 
 function renderEditorContent(ch) {
+  const uiIcon = name => `<svg class="ui-icon" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
   return `
     <div style="display:flex;flex:1;overflow:hidden;">
       <!-- 왼쪽: 툴바 + 단축키 + 에디터 -->
@@ -3522,24 +3523,24 @@ function renderEditorContent(ch) {
           </select>
           <span class="wordcount" id="wc-display">${(ch.content||'').length.toLocaleString()}자</span>
           <div class="editor-toolbar-spacer"></div>
-          <button class="btn btn-outline btn-sm" onclick="toggleSplitPanel()" id="split-toggle-btn" title="참고 패널" style="font-size:12px">⊞ 참고</button>
-          <button class="btn btn-outline btn-sm typewriter-toggle" onclick="toggleTypewriterScrolling()" aria-pressed="false" title="입력 중인 줄을 화면 가운데에 유지" style="font-size:12px">⌖ 타자기 스크롤</button>
-          <button class="btn btn-outline btn-sm" onclick="enterFocusMode()" title="집중 모드" style="font-size:13px">⛶ 집중</button>
-          <button class="btn btn-outline btn-sm" onclick="showChExportMenu('${ch.id}')" title="이 화 내보내기" style="font-size:12px">📤 내보내기</button>
+          <button class="btn btn-outline btn-sm" onclick="toggleSplitPanel()" id="split-toggle-btn" title="참고 패널" style="font-size:12px">${uiIcon('overview')} 참고</button>
+          <button class="btn btn-outline btn-sm typewriter-toggle" onclick="toggleTypewriterScrolling()" aria-pressed="false" title="입력 중인 줄을 화면 가운데에 유지" style="font-size:12px">${uiIcon('typewriter')} 타자기 스크롤</button>
+          <button class="btn btn-outline btn-sm" onclick="enterFocusMode()" title="집중 모드" style="font-size:13px">${uiIcon('expand')} 집중</button>
+          <button class="btn btn-outline btn-sm" onclick="showChExportMenu('${ch.id}')" title="이 화 내보내기" style="font-size:12px">${uiIcon('export')} 내보내기</button>
           <details class="editor-more">
             <summary class="btn btn-outline btn-sm" aria-label="추가 집필 도구">⋯ 도구</summary>
             <div class="editor-more-actions">
-              <label class="reader-style-control">📖 화면 양식
+              <label class="reader-style-control">${uiIcon('glossary')} 화면 양식
                 <select class="reader-style-select" aria-label="집필 화면 양식" title="집필 화면의 보기만 바뀝니다" onchange="changeReaderStyle(this.value)">${readerStyleOptions()}</select>
               </label>
-              <button class="btn btn-outline btn-sm" onclick="this.closest('details').open=false;toggleFindReplace()" id="find-replace-btn" title="찾기/바꾸기 (Ctrl+H)">🔍 찾기</button>
+              <button class="btn btn-outline btn-sm" onclick="this.closest('details').open=false;toggleFindReplace()" id="find-replace-btn" title="찾기/바꾸기 (Ctrl+H)">${uiIcon('search')} 찾기</button>
               <div class="editor-font-controls">
                 <button onclick="changeFontSize(-1)" aria-label="글자 크기 줄이기">−</button>
                 <span id="font-size-display">16px</span>
                 <button onclick="changeFontSize(1)" aria-label="글자 크기 키우기">＋</button>
               </div>
-              <button class="btn btn-outline btn-sm" onclick="this.closest('details').open=false;togglePomodoro()" id="pomo-toolbar-btn" title="뽀모도로 타이머">🍅 집필</button>
-              <button class="btn btn-outline btn-sm" id="sym-toggle-btn" onclick="this.closest('details').open=false;toggleSymbolPalette()">✦ 기호</button>
+              <button class="btn btn-outline btn-sm" onclick="this.closest('details').open=false;togglePomodoro()" id="pomo-toolbar-btn" title="뽀모도로 타이머">${uiIcon('timer')} 집필</button>
+              <button class="btn btn-outline btn-sm" id="sym-toggle-btn" onclick="this.closest('details').open=false;toggleSymbolPalette()">${uiIcon('sparkle')} 기호</button>
               <button class="btn btn-outline btn-sm" onclick="this.closest('details').open=false;deleteChapter('${ch.id}')" style="color:var(--rust);border-color:rgba(181,69,27,.25)">삭제</button>
             </div>
           </details>
@@ -3547,7 +3548,7 @@ function renderEditorContent(ch) {
         </div>
         <div id="shortcut-bar" style="padding:6px 12px;background:var(--cream);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:4px;flex-wrap:wrap;flex-shrink:0;"></div>
         <div style="padding:5px 16px;background:var(--gold-light);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
-          <span style="font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0">📝 회차 요약</span>
+          <span style="font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0">${uiIcon('memo')} 회차 요약</span>
           <input id="chapter-summary-input" value="${esc(ch.summary||'')}"
             placeholder="이 화의 핵심 내용을 한 줄로 요약하세요 (화 목록에 표시됩니다)"
             onchange="updateChapter('${ch.id}','summary',this.value)"
@@ -3582,15 +3583,15 @@ function renderEditorContent(ch) {
         <div class="split-resizer" role="separator" tabindex="0" aria-label="참고 패널 너비 조절" aria-orientation="vertical" title="드래그하여 참고 패널 너비 조절"></div>
         <div class="split-panel-tabs" id="split-tabs" style="overflow-x:auto;flex-wrap:nowrap;display:flex;align-items:center">
           <div style="display:flex;flex:1;overflow-x:auto;flex-wrap:nowrap">
-            <button class="split-tab active" onclick="switchSplitTab('overview')">📋 개요</button>
-            <button class="split-tab" onclick="switchSplitTab('world')">🌍 세계관</button>
-            <button class="split-tab" onclick="switchSplitTab('plot')">📐 플롯</button>
-            <button class="split-tab" onclick="switchSplitTab('characters')">👤 인물</button>
-            <button class="split-tab" onclick="switchSplitTab('relations')">🔗 관계도</button>
-            <button class="split-tab" onclick="switchSplitTab('family')">🏰 가문</button>
-            <button class="split-tab" onclick="switchSplitTab('glossary')">📖 용어</button>
-            <button class="split-tab" onclick="switchSplitTab('items')">📦 아이템</button>
-            <button class="split-tab" onclick="switchSplitTab('memo')">📝 메모</button>
+            <button class="split-tab active" onclick="switchSplitTab('overview')">${uiIcon('overview')} 개요</button>
+            <button class="split-tab" onclick="switchSplitTab('world')">${uiIcon('world')} 세계관</button>
+            <button class="split-tab" onclick="switchSplitTab('plot')">${uiIcon('plot')} 플롯</button>
+            <button class="split-tab" onclick="switchSplitTab('characters')">${uiIcon('characters')} 인물</button>
+            <button class="split-tab" onclick="switchSplitTab('relations')">${uiIcon('relations')} 관계도</button>
+            <button class="split-tab" onclick="switchSplitTab('family')">${uiIcon('family')} 가문</button>
+            <button class="split-tab" onclick="switchSplitTab('glossary')">${uiIcon('glossary')} 용어</button>
+            <button class="split-tab" onclick="switchSplitTab('items')">${uiIcon('items')} 아이템</button>
+            <button class="split-tab" onclick="switchSplitTab('memo')">${uiIcon('memo')} 메모</button>
           </div>
           <button onclick="toggleSplitPanel()" class="split-panel-close-btn"
             style="display:none;flex-shrink:0;padding:6px 10px;background:none;border:none;
@@ -8349,7 +8350,12 @@ function initDarkMode() {
 function applyDarkMode(isDark) {
   document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
   const btn = document.getElementById('btn-darkmode');
-  if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+  if (btn) {
+    btn.querySelector('use')?.setAttribute('href', isDark ? '#icon-sun' : '#icon-moon');
+    const label = isDark ? '라이트모드 전환' : '다크모드 전환';
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  }
   localStorage.setItem('hopil_studio_darkmode', isDark);
 }
 
