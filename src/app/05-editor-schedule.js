@@ -867,6 +867,11 @@ function chDragCommit() {
   }, 50);
 }
 
+function openCategoryMenuFromChapterPanel() {
+  toggleMobileChapterPanel();
+  toggleSidebar();
+}
+
 function toggleMobileChapterPanel() {
   const panel = document.getElementById('mobile-chapter-panel');
   const bd = document.getElementById('mobile-chapter-backdrop');

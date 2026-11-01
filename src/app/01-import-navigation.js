@@ -357,6 +357,9 @@ function toggleSidebar() {
       sb.classList.remove('open');
       ov.style.display = 'none';
     } else {
+      if (document.getElementById('mobile-chapter-panel')?.classList.contains('open')) {
+        toggleMobileChapterPanel();
+      }
       sb.classList.add('open');
       ov.style.display = 'block';
     }
