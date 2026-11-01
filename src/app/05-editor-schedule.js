@@ -189,6 +189,29 @@ function renderChapters() {
   }, 0);
 }
 
+function positionEditorMore(details) {
+  if (!details.open) return;
+  const summary = details.querySelector('summary');
+  const menu = details.querySelector('.editor-more-actions');
+  if (!summary || !menu) return;
+  const anchor = summary.getBoundingClientRect();
+  const width = menu.offsetWidth;
+  const height = menu.offsetHeight;
+  const left = Math.max(8, Math.min(anchor.right - width, window.innerWidth - width - 8));
+  const below = anchor.bottom + 8;
+  const above = anchor.top - height - 8;
+  const top = below + height <= window.innerHeight - 8
+    ? below
+    : above >= 8 ? above : Math.max(8, window.innerHeight - height - 8);
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+}
+
+window.addEventListener('resize', () => {
+  const openMenu = document.querySelector('.editor-more[open]');
+  if (openMenu) positionEditorMore(openMenu);
+});
+
 function renderEditorContent(ch) {
   const uiIcon = name => `<svg class="ui-icon" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
   return `
@@ -207,7 +230,7 @@ function renderEditorContent(ch) {
           <button class="btn btn-outline btn-sm typewriter-toggle" onclick="toggleTypewriterScrolling()" aria-pressed="false" title="입력 중인 줄을 화면 가운데에 유지" style="font-size:12px">${uiIcon('typewriter')} 타자기 스크롤</button>
           <button class="btn btn-outline btn-sm" onclick="enterFocusMode()" title="집중 모드" style="font-size:13px">${uiIcon('expand')} 집중</button>
           <button class="btn btn-outline btn-sm" onclick="showChExportMenu('${ch.id}')" title="이 화 내보내기" style="font-size:12px">${uiIcon('export')} 내보내기</button>
-          <details class="editor-more">
+          <details class="editor-more" ontoggle="positionEditorMore(this)">
             <summary class="btn btn-outline btn-sm" aria-label="추가 집필 도구">⋯ 도구</summary>
             <div class="editor-more-actions">
               <label class="reader-style-control">${uiIcon('glossary')} 화면 양식

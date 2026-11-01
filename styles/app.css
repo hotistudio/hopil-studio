@@ -1015,9 +1015,10 @@ button.stats-heatmap-day:focus-visible{outline:2px solid var(--gold);outline-off
 .editor-more summary::-webkit-details-marker{display:none}
 .editor-more[open] summary{background:var(--gold-light);border-color:var(--gold);color:var(--gold)}
 .editor-more-actions{
-  position:absolute;right:0;top:calc(100% + 8px);z-index:310;
+  position:fixed;z-index:1300;
   display:flex;align-items:center;flex-wrap:wrap;gap:6px;
   width:max-content;max-width:min(340px,calc(100vw - 24px));
+  max-height:calc(100dvh - 16px);overflow-y:auto;
   padding:10px;background:var(--white);border:1px solid var(--border);
   border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12)
 }
@@ -1054,7 +1055,6 @@ button.stats-heatmap-day:focus-visible{outline:2px solid var(--gold);outline-off
   .split-tab{padding:6px 10px}
   .editor-toolbar .btn{padding:6px 8px}
   .editor-toolbar-spacer{flex-basis:100%}
-  .editor-more-actions{right:-2px}
   #focus-toolbar>div:first-child{flex:0 0 100%}
   #focus-editor-wrap{padding:14px 16px !important}
 }
