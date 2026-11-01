@@ -44,6 +44,8 @@ function renderCharacters() {
             ${c.personality?`<div style="font-size:13px;color:var(--ink);line-height:1.6;margin-bottom:4px">${esc(c.personality)}</div>`:''}
             ${c.background?`<div style="font-size:12px;color:var(--muted);margin-bottom:4px">배경: ${esc(c.background)}</div>`:''}
             ${c.speech?`<div style="font-size:12px;color:var(--teal)">특징/능력: ${esc(c.speech)}</div>`:''}
+            ${c.likes?`<div style="font-size:12px;color:var(--muted)">좋아하는 것: ${esc(c.likes)}</div>`:''}
+            ${c.dislikes?`<div style="font-size:12px;color:var(--muted)">싫어하는 것: ${esc(c.dislikes)}</div>`:''}
             ${c.goal?`<div style="font-size:12px;color:var(--rust)">목표: ${esc(c.goal)}</div>`:''}
             ${c.honorific ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
               ${c.honorific.split(',').map(h=>h.trim()).filter(Boolean).map(h=>
@@ -156,6 +158,8 @@ function renderCharBasicTab(idx) {
       <div class="full"><label class="label">성격</label><textarea id="cm-per" rows="2" placeholder="성격 설명">${esc(c.personality||'')}</textarea></div>
       <div class="full"><label class="label">배경 / 과거</label><textarea id="cm-bg" rows="3" placeholder="캐릭터 배경, 과거, 동기">${esc(c.background||'')}</textarea></div>
       <div class="full"><label class="label">특징과 능력</label><textarea id="cm-sp" rows="2" placeholder="특징, 능력, 말투 등">${esc(c.speech||'')}</textarea></div>
+      <div><label class="label" for="cm-likes">좋아하는 것</label><textarea id="cm-likes" rows="2" placeholder="예: 비 오는 날, 오래된 책">${esc(c.likes||'')}</textarea></div>
+      <div><label class="label" for="cm-dislikes">싫어하는 것</label><textarea id="cm-dislikes" rows="2" placeholder="예: 거짓말, 시끄러운 장소">${esc(c.dislikes||'')}</textarea></div>
       <div class="full"><label class="label">목표 / 욕망</label><textarea id="cm-goal" rows="2" placeholder="이 인물이 원하는 것, 동기...">${esc(c.goal||'')}</textarea></div>
       <div class="full"><label class="label">칭호</label><input id="cm-title" placeholder="쉼표로 구분 예: 검은 마왕, 성벽의 기사, 불사신" value="${esc(c.honorific||'')}"></div>
       <div class="full">
@@ -467,6 +471,8 @@ function saveChar(idx) {
     personality: document.getElementById('cm-per').value,
     background: document.getElementById('cm-bg').value,
     speech: document.getElementById('cm-sp').value,
+    likes: document.getElementById('cm-likes').value,
+    dislikes: document.getElementById('cm-dislikes').value,
     honorific: document.getElementById('cm-title')?.value || '',
     gender: document.getElementById('cm-gender')?.value || '',
     alive: document.getElementById('cm-alive')?.value || '생존',

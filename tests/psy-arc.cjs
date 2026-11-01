@@ -20,6 +20,7 @@ const project = {
 };
 const fields = new Map([
   ['cm-name', '새 이름'], ['pa-title', 'ID 연결 아크'], ['pa-char', 'char-1'],
+  ['cm-likes', '오래된 책'], ['cm-dislikes', '거짓말'],
   ['ps-title', '결심'], ['ps-emotion', '결의'], ['ps-chapter', 'chapter-1'],
   ['ps-trigger', '진실을 앎'], ['ps-before', '아무도 믿지 않는다'],
   ['ps-after', '동료를 믿는다'], ['ps-content', '동료와 함께 간다'],
@@ -39,10 +40,20 @@ vm.runInContext(section(features, 'function getPsyArcCharacter(', '// 배경색�
 vm.runInContext(section(features, 'function savePsyArc(', 'function deletePsyArc('), context);
 vm.runInContext(section(features, 'function savePsyStep(', 'function deletePsyStep('), context);
 vm.runInContext(section(characters, 'function saveChar(', 'function deleteChar('), context);
+context.ROLES = ['주인공'];
+context.CHAR_COLORS = [];
+context.selOpts = () => '';
+context.esc = value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;');
+vm.runInContext(section(characters, 'function renderCharBasicTab(', '// RELATION TAB'), context);
 
 assert.equal(context.getPsyArcCharacter(project.psyArcs[0], project).id, 'char-1');
 context.saveChar(0);
 assert.equal(project.characters[0].name, '새 이름');
+assert.equal(project.characters[0].likes, '오래된 책');
+assert.equal(project.characters[0].dislikes, '거짓말');
+const characterForm = context.renderCharBasicTab(0);
+assert.match(characterForm, /id="cm-likes"[^>]*>오래된 책<\/textarea>/);
+assert.match(characterForm, /id="cm-dislikes"[^>]*>거짓말<\/textarea>/);
 assert.equal(project.psyArcs[0].charId, 'char-1');
 assert.equal(project.psyArcs[0].charName, '새 이름');
 assert.equal(project.psyArcs[1].charName, '다른 인물');

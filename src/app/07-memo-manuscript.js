@@ -996,6 +996,8 @@ function renderSplitContent() {
             ${c.personality?`<div style="margin-bottom:3px"><span style="color:${cardText};opacity:.6">성격 </span>${esc(c.personality)}</div>`:''}
             ${c.background?`<div style="margin-bottom:3px"><span style="color:${cardText};opacity:.6">배경 </span>${esc(c.background)}</div>`:''}
             ${c.speech?`<div style="margin-bottom:3px"><span style="color:${cardText};opacity:.6">특징/능력 </span>${esc(c.speech)}</div>`:''}
+            ${c.likes?`<div style="margin-bottom:3px"><span style="color:${cardText};opacity:.6">좋아하는 것 </span>${esc(c.likes)}</div>`:''}
+            ${c.dislikes?`<div style="margin-bottom:3px"><span style="color:${cardText};opacity:.6">싫어하는 것 </span>${esc(c.dislikes)}</div>`:''}
             ${c.goal?`<div><span style="color:var(--rust);font-weight:600">목표 </span>${esc(c.goal)}</div>`:''}
           </div>`}
         </div>`;
