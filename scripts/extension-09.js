@@ -28,6 +28,7 @@
       localStorage.setItem(STORAGE_STATE, JSON.stringify(saved));
     } catch(e) {}
   }
+  window.pomoSaveState = saveState;
 
   function loadState() {
     try {
@@ -114,7 +115,7 @@
       if (btn) btn.textContent = '▶';
     } else {
       // 시작 — endAt 설정
-      if (pomoState.mode === 'work' && pomoState.remaining === (typeof POMO_WORK !== 'undefined' ? POMO_WORK : 1500)) {
+      if (pomoState.mode === 'work' && pomoState.remaining === pomoState.total) {
         const editor = document.getElementById('prose-editor') || document.getElementById('focus-editor');
         pomoState.startChars = editor ? editor.value.length : 0;
         if (typeof resetSessionTyping === 'function') resetSessionTyping();
@@ -193,6 +194,7 @@
   const _origPomoSkip = window.pomoSkip;
   window.pomoSkip = function () {
     _origPomoSkip.apply(this, arguments);
+    if (window.pomoState) pomoState.endAt = null;
     saveState();
   };
 

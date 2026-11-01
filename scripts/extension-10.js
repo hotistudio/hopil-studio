@@ -86,9 +86,7 @@
   };
 
   // ─── 작업 시작 시 cfg 값 반영 ────────────────────────────────────
-  // pomoToggle 이 시작 시 이전에 'remaining === POMO_WORK' 인지 체크해서
-  // startChars 를 저장함. POMO_WORK 는 바뀌지 않으니 이 조건은 거의 항상 false.
-  // 대신 우리가 직접 'pomoState.mode === work 이고 remaining === total' 체크.
+  // 시작 시 현재 모드의 설정 시간을 적용하고 일시정지 상태는 유지한다.
   const _prevPomoToggle = window.pomoToggle;
   window.pomoToggle = function () {
     if (!window.pomoState) return _prevPomoToggle.apply(this, arguments);
@@ -116,6 +114,18 @@
       pomoState.remaining = pomoState.total;
     }
     _prevPomoReset.apply(this, arguments);
+  };
+
+  const _prevPomoSkip = window.pomoSkip;
+  window.pomoSkip = function () {
+    const wasWork = window.pomoState && pomoState.mode === 'work';
+    _prevPomoSkip.apply(this, arguments);
+    if (!window.pomoState) return;
+    if (wasWork) pomoState.mode = 'short';
+    pomoState.total = secFor(pomoState.mode);
+    pomoState.remaining = pomoState.total;
+    if (typeof pomoUpdateDisplay === 'function') pomoUpdateDisplay();
+    if (typeof window.pomoSaveState === 'function') window.pomoSaveState();
   };
 
   // ─── 스페이스바 재생/일시정지 ───────────────────────────────────
@@ -290,8 +300,10 @@
   setTimeout(() => {
     if (!window.pomoState) return;
     if (pomoState.running) return;
-    pomoState.total = secFor(pomoState.mode);
-    pomoState.remaining = pomoState.total;
+    const previousTotal = pomoState.total;
+    const configuredTotal = secFor(pomoState.mode);
+    if (pomoState.remaining === previousTotal) pomoState.remaining = configuredTotal;
+    pomoState.total = configuredTotal;
     if (typeof pomoUpdateDisplay === 'function') pomoUpdateDisplay();
   }, 400);
 })();

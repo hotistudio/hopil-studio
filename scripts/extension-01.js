@@ -169,7 +169,19 @@ function pomoReset() {
 function pomoSkip() {
   clearInterval(pomoState.timer);
   pomoState.running = false;
-  pomoComplete();
+  document.getElementById('pomo-playpause').textContent = '▶';
+  if (pomoState.mode === 'work') {
+    pomoState.session++;
+    pomoState.mode = 'short';
+    pomoState.total = POMO_SHORT;
+  } else {
+    pomoState.mode = 'work';
+    pomoState.total = POMO_WORK;
+  }
+  pomoState.remaining = pomoState.total;
+  pomoHideToast();
+  pomoRenderDots();
+  pomoUpdateDisplay();
 }
 
 function pomoSetGoal(delta) {
