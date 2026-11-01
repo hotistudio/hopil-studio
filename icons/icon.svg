@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="펼친 책을 형상화한 호필 스튜디오 아이콘">
+  <rect width="512" height="512" rx="108" fill="#f7f5ef"/>
+  <path d="M256 177c-40-26-88-34-144-18v190c56-16 104-8 144 18"
+        fill="none" stroke="#28312e" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 177c40-26 88-34 144-18v190c-56-16-104-8-144 18"
+        fill="none" stroke="#28312e" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 180v181" fill="none" stroke="#ad7845" stroke-width="14" stroke-linecap="round"/>
+</svg>
