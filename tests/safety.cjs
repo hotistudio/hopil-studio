@@ -41,6 +41,14 @@ async function main() {
   assert.equal(await write(failing, { content: 'test' }), false);
   assert.equal(context.fileHandles.projects.project, undefined);
 
+  const empty = {
+    async createWritable() { return { async write() {}, async close() {} }; },
+    async getFile() { return { size: 0 }; }
+  };
+  context.fileHandles.projects.project = empty;
+  assert.equal(await write(empty, { content: '원고' }), false);
+  assert.equal(context.fileHandles.projects.project, undefined);
+
   const store = new Map([['hopil_studio_projects_v1', '{broken json']]);
   const recovery = vm.createContext({
     STORAGE_KEY: 'hopil_studio_projects_v1', state: { projects: [] },

@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&family=Black+Han+Sans&display=swap" rel="stylesheet">
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="styles/fonts.css">
-<link rel="stylesheet" href="styles/app.css?v=0.7.0">
+<link rel="stylesheet" href="styles/app.css?v=0.7.1">
 </head>
 <body>
 <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
@@ -46,7 +46,7 @@
 <div id="app">
   <!-- HEADER -->
   <header id="header">
-    <button id="header-title" onclick="goHome()">호필 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.7.0 beta</span></button>
+    <button id="header-title" onclick="goHome()">호필 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.7.1 beta</span></button>
     <button class="header-btn" id="menu-toggle" onclick="toggleSidebar()" aria-label="메뉴 열기" style="display:none;padding:6px 8px">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- 왼쪽 세로선 -->
@@ -67,7 +67,7 @@
 
       <span id="file-status" style="margin-right:4px"></span>
       <button class="header-btn" onclick="document.getElementById('import-single-file').click()" id="btn-load-project" style="display:none" aria-label="작품 불러오기"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-open"></use></svg><span class="btn-text">작품 불러오기</span></button>
-      <button class="header-btn gold" onclick="exportCurrentProject()" id="btn-save-project" style="display:none" title="파일에 저장 (처음엔 파일 선택, 이후 같은 파일에 덮어쓰기)" aria-label="현재 작품을 파일에 저장"><svg class="ui-icon" aria-hidden="true"><use href="#icon-save"></use></svg><span class="btn-text">파일 저장</span></button>
+      <button class="header-btn gold" onclick="exportCurrentProject()" id="btn-save-project" style="display:none" title="작품 JSON 파일 저장 또는 공유" aria-label="현재 작품을 파일로 저장하거나 공유"><svg class="ui-icon" aria-hidden="true"><use href="#icon-save"></use></svg><span class="btn-text">파일 저장</span></button>
     </div>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
     <input type="file" id="import-single-file" accept=".json" style="display:none" onchange="importSingleProject(event)">
@@ -202,7 +202,7 @@
 </div>
 <div id="mobile-chapter-backdrop" onclick="toggleMobileChapterPanel()" style="display:none"></div>
 
-<script src="scripts/app.js?v=0.7.0"></script>
+<script src="scripts/app.js?v=0.7.1"></script>
 
 <div id="focus-overlay">
   <div id="focus-toolbar">

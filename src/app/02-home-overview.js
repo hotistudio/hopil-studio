@@ -27,8 +27,8 @@ function renderHome() {
           <div class="project-card-footer">
             <span class="project-card-meta">${(p.chapters||[]).length}화 · ${wordCount.toLocaleString()}자</span>
             <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
-              <button class="btn btn-outline btn-sm" onclick="exportSingleProject('${p.id}')" title="처음엔 파일 선택, 이후 덮어쓰기 저장">
-                💾 저장
+              <button class="btn btn-outline btn-sm" onclick="exportSingleProject('${p.id}')" title="작품 JSON 파일 저장 또는 공유">
+                💾 파일 저장
               </button>
               <button class="btn btn-danger btn-sm" onclick="deleteProjectByIndex(${_pi})">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -46,7 +46,7 @@ function renderHome() {
         <h1>호필 스튜디오</h1>
         <p>아이디어에서 완성작까지 — 당신의 이야기를 완성하세요</p>
         <span style="font-size:12px;color:var(--border);font-family:'Noto Serif KR',serif;letter-spacing:.5px;font-weight:400;display:block;margin-top:6px">제작자 : 호백 with Claude</span>
-        <span style="font-size:11px;color:var(--muted);opacity:.8;display:block;margin-top:8px">✏️ 글은 입력 후 자동저장 · 💾 파일 저장 버튼으로 JSON 백업 · ⚠️ Ctrl+S는 브라우저 페이지 저장 단축키이므로 사용하지 마세요</span>
+        <span style="font-size:11px;color:var(--muted);opacity:.8;display:block;margin-top:8px">✏️ 입력 내용은 이 기기에 자동저장 · 💾 파일 저장으로 별도 JSON 백업</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -74,7 +74,7 @@ function renderHome() {
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
         <p style="font-size:11px;color:var(--muted);opacity:.6;line-height:1.8">
-          호필 스튜디오 v0.7.0 beta · © 2026 호백<br>
+          호필 스튜디오 v0.7.1 beta · © 2026 호백<br>
           <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
             style="color:var(--muted);text-decoration:none;opacity:.8">CC BY-NC 4.0</a>
           · 비상업적 목적에 한해 자유롭게 사용 가능<br>

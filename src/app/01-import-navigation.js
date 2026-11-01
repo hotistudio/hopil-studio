@@ -11,58 +11,73 @@ async function exportAllProjects() {
 async function exportCurrentProject() {
   const p = getProject();
   if (!p) { toast('저장할 작품이 없어요.'); return; }
+  return saveProjectBackup(p);
+}
+
+async function saveProjectBackup(p) {
+  const data = projectBackup(p);
+  const filename = (p.title || '작품') + '.json';
+  const fallbackName = (p.title || '작품') + '_' + getTodayStr() + '.json';
+
+  // 안드로이드 파일 선택창에서 0바이트 파일이 만들어질 수 있으므로
+  // 사용자가 Drive를 고를 수 있는 공유창을 우선 사용한다.
+  if (/Android/i.test(navigator.userAgent || '')) {
+    if (typeof File !== 'undefined' && navigator.canShare && navigator.share) {
+      try {
+        const file = new File([JSON.stringify(data, null, 2)], filename, { type: 'application/json' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: p.title || '작품' });
+          toast('파일을 공유 앱에 전달했습니다. Drive에서 업로드 완료를 확인해주세요.');
+          return true;
+        }
+      } catch (e) {
+        if (e.name === 'AbortError') return null;
+        console.error('파일 공유 실패:', e);
+      }
+    }
+    return downloadProjectBackup(data, fallbackName);
+  }
+
   if (FS_SUPPORTED) {
     try {
       if (fileHandles.projects[p.id]) {
-        const ok = await writeToFileHandle(fileHandles.projects[p.id], projectBackup(p));
-        if (ok) { toast(`"${p.title||'작품'}" 저장 완료 💾`); return; }
+        const ok = await writeToFileHandle(fileHandles.projects[p.id], data);
+        if (ok) { toast(`"${p.title||'작품'}" 저장 완료 💾`); return true; }
       }
       const handle = await window.showSaveFilePicker({
-        suggestedName: (p.title||'작품') + '.json',
+        suggestedName: filename,
         types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
       });
+      const ok = await writeToFileHandle(handle, data);
+      if (!ok) return downloadProjectBackup(data, fallbackName);
       fileHandles.projects[p.id] = handle;
-      const ok = await writeToFileHandle(handle, projectBackup(p));
-      if (!ok) return;
       toast(`파일 연결 완료! 이후 자동으로 같은 파일에 저장됩니다 💾`);
       updateFileStatus();
+      return true;
     } catch(e) {
-      if (e.name !== 'AbortError') {
-        _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
-      }
+      if (e.name === 'AbortError') return null;
+      console.error('파일 선택 실패:', e);
+      return downloadProjectBackup(data, fallbackName);
     }
-  } else {
-    _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
-    toast(`"${p.title||'작품'}" 백업 저장 완료 📦`);
   }
+  return downloadProjectBackup(data, fallbackName);
 }
 
 async function exportSingleProject(pid) {
   const p = state.projects.find(p => p.id === pid);
   if (!p) return;
-  if (FS_SUPPORTED) {
-    try {
-      if (fileHandles.projects[pid]) {
-        const ok = await writeToFileHandle(fileHandles.projects[pid], projectBackup(p));
-        if (ok) { toast(`"${p.title||'작품'}" 저장 완료 💾`); return; }
-      }
-      const handle = await window.showSaveFilePicker({
-        suggestedName: (p.title||'작품') + '.json',
-        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
-      });
-      fileHandles.projects[pid] = handle;
-      const ok = await writeToFileHandle(handle, projectBackup(p));
-      if (!ok) return;
-      toast(`"${p.title||'작품'}" 파일 연결 완료! 💾`);
-      updateFileStatus();
-    } catch(e) {
-      if (e.name !== 'AbortError') {
-        _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
-      }
-    }
-  } else {
-    _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
-    toast(`"${p.title||'작품'}" 저장 완료 📁`);
+  return saveProjectBackup(p);
+}
+
+function downloadProjectBackup(data, filename) {
+  try {
+    _downloadJson(data, filename);
+    toast('JSON 파일을 다운로드했습니다. 파일 크기와 내용을 확인해주세요.');
+    return true;
+  } catch (e) {
+    console.error('JSON 다운로드 실패:', e);
+    toast('⚠️ 파일을 저장하지 못했습니다. 이 기기의 자동저장 원고는 유지됩니다.');
+    return false;
   }
 }
 
@@ -73,9 +88,13 @@ function exportData() { exportCurrentProject(); }
 function _downloadJson(data, filename) {
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
+  a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 // 파일 연결 해제

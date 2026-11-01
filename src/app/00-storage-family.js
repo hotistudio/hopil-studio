@@ -33,6 +33,11 @@ function writeToFileHandle(handle, data) {
     const writable = await handle.createWritable();
     await writable.write(snapshot);
     await writable.close();
+    // 일부 파일 제공자는 빈 파일을 만든 뒤 쓰기를 완료하지 못한다.
+    const saved = typeof handle.getFile === 'function' ? await handle.getFile() : null;
+    if (saved && saved.size === 0 && snapshot.length > 0) {
+      throw new Error('저장된 파일이 0바이트입니다.');
+    }
     return true;
   });
   fileWriteQueues.set(handle, pending.catch(() => {}));

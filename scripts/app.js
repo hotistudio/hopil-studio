@@ -33,6 +33,11 @@ function writeToFileHandle(handle, data) {
     const writable = await handle.createWritable();
     await writable.write(snapshot);
     await writable.close();
+    // 일부 파일 제공자는 빈 파일을 만든 뒤 쓰기를 완료하지 못한다.
+    const saved = typeof handle.getFile === 'function' ? await handle.getFile() : null;
+    if (saved && saved.size === 0 && snapshot.length > 0) {
+      throw new Error('저장된 파일이 0바이트입니다.');
+    }
     return true;
   });
   fileWriteQueues.set(handle, pending.catch(() => {}));
@@ -1147,58 +1152,73 @@ async function exportAllProjects() {
 async function exportCurrentProject() {
   const p = getProject();
   if (!p) { toast('저장할 작품이 없어요.'); return; }
+  return saveProjectBackup(p);
+}
+
+async function saveProjectBackup(p) {
+  const data = projectBackup(p);
+  const filename = (p.title || '작품') + '.json';
+  const fallbackName = (p.title || '작품') + '_' + getTodayStr() + '.json';
+
+  // 안드로이드 파일 선택창에서 0바이트 파일이 만들어질 수 있으므로
+  // 사용자가 Drive를 고를 수 있는 공유창을 우선 사용한다.
+  if (/Android/i.test(navigator.userAgent || '')) {
+    if (typeof File !== 'undefined' && navigator.canShare && navigator.share) {
+      try {
+        const file = new File([JSON.stringify(data, null, 2)], filename, { type: 'application/json' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: p.title || '작품' });
+          toast('파일을 공유 앱에 전달했습니다. Drive에서 업로드 완료를 확인해주세요.');
+          return true;
+        }
+      } catch (e) {
+        if (e.name === 'AbortError') return null;
+        console.error('파일 공유 실패:', e);
+      }
+    }
+    return downloadProjectBackup(data, fallbackName);
+  }
+
   if (FS_SUPPORTED) {
     try {
       if (fileHandles.projects[p.id]) {
-        const ok = await writeToFileHandle(fileHandles.projects[p.id], projectBackup(p));
-        if (ok) { toast(`"${p.title||'작품'}" 저장 완료 💾`); return; }
+        const ok = await writeToFileHandle(fileHandles.projects[p.id], data);
+        if (ok) { toast(`"${p.title||'작품'}" 저장 완료 💾`); return true; }
       }
       const handle = await window.showSaveFilePicker({
-        suggestedName: (p.title||'작품') + '.json',
+        suggestedName: filename,
         types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
       });
+      const ok = await writeToFileHandle(handle, data);
+      if (!ok) return downloadProjectBackup(data, fallbackName);
       fileHandles.projects[p.id] = handle;
-      const ok = await writeToFileHandle(handle, projectBackup(p));
-      if (!ok) return;
       toast(`파일 연결 완료! 이후 자동으로 같은 파일에 저장됩니다 💾`);
       updateFileStatus();
+      return true;
     } catch(e) {
-      if (e.name !== 'AbortError') {
-        _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
-      }
+      if (e.name === 'AbortError') return null;
+      console.error('파일 선택 실패:', e);
+      return downloadProjectBackup(data, fallbackName);
     }
-  } else {
-    _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
-    toast(`"${p.title||'작품'}" 백업 저장 완료 📦`);
   }
+  return downloadProjectBackup(data, fallbackName);
 }
 
 async function exportSingleProject(pid) {
   const p = state.projects.find(p => p.id === pid);
   if (!p) return;
-  if (FS_SUPPORTED) {
-    try {
-      if (fileHandles.projects[pid]) {
-        const ok = await writeToFileHandle(fileHandles.projects[pid], projectBackup(p));
-        if (ok) { toast(`"${p.title||'작품'}" 저장 완료 💾`); return; }
-      }
-      const handle = await window.showSaveFilePicker({
-        suggestedName: (p.title||'작품') + '.json',
-        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
-      });
-      fileHandles.projects[pid] = handle;
-      const ok = await writeToFileHandle(handle, projectBackup(p));
-      if (!ok) return;
-      toast(`"${p.title||'작품'}" 파일 연결 완료! 💾`);
-      updateFileStatus();
-    } catch(e) {
-      if (e.name !== 'AbortError') {
-        _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
-      }
-    }
-  } else {
-    _downloadJson(projectBackup(p), (p.title||'작품') + '_' + getTodayStr() + '.json');
-    toast(`"${p.title||'작품'}" 저장 완료 📁`);
+  return saveProjectBackup(p);
+}
+
+function downloadProjectBackup(data, filename) {
+  try {
+    _downloadJson(data, filename);
+    toast('JSON 파일을 다운로드했습니다. 파일 크기와 내용을 확인해주세요.');
+    return true;
+  } catch (e) {
+    console.error('JSON 다운로드 실패:', e);
+    toast('⚠️ 파일을 저장하지 못했습니다. 이 기기의 자동저장 원고는 유지됩니다.');
+    return false;
   }
 }
 
@@ -1209,9 +1229,13 @@ function exportData() { exportCurrentProject(); }
 function _downloadJson(data, filename) {
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
+  a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 // 파일 연결 해제
@@ -1616,8 +1640,8 @@ function renderHome() {
           <div class="project-card-footer">
             <span class="project-card-meta">${(p.chapters||[]).length}화 · ${wordCount.toLocaleString()}자</span>
             <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
-              <button class="btn btn-outline btn-sm" onclick="exportSingleProject('${p.id}')" title="처음엔 파일 선택, 이후 덮어쓰기 저장">
-                💾 저장
+              <button class="btn btn-outline btn-sm" onclick="exportSingleProject('${p.id}')" title="작품 JSON 파일 저장 또는 공유">
+                💾 파일 저장
               </button>
               <button class="btn btn-danger btn-sm" onclick="deleteProjectByIndex(${_pi})">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -1635,7 +1659,7 @@ function renderHome() {
         <h1>호필 스튜디오</h1>
         <p>아이디어에서 완성작까지 — 당신의 이야기를 완성하세요</p>
         <span style="font-size:12px;color:var(--border);font-family:'Noto Serif KR',serif;letter-spacing:.5px;font-weight:400;display:block;margin-top:6px">제작자 : 호백 with Claude</span>
-        <span style="font-size:11px;color:var(--muted);opacity:.8;display:block;margin-top:8px">✏️ 글은 입력 후 자동저장 · 💾 파일 저장 버튼으로 JSON 백업 · ⚠️ Ctrl+S는 브라우저 페이지 저장 단축키이므로 사용하지 마세요</span>
+        <span style="font-size:11px;color:var(--muted);opacity:.8;display:block;margin-top:8px">✏️ 입력 내용은 이 기기에 자동저장 · 💾 파일 저장으로 별도 JSON 백업</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -1663,7 +1687,7 @@ function renderHome() {
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
         <p style="font-size:11px;color:var(--muted);opacity:.6;line-height:1.8">
-          호필 스튜디오 v0.7.0 beta · © 2026 호백<br>
+          호필 스튜디오 v0.7.1 beta · © 2026 호백<br>
           <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
             style="color:var(--muted);text-decoration:none;opacity:.8">CC BY-NC 4.0</a>
           · 비상업적 목적에 한해 자유롭게 사용 가능<br>
