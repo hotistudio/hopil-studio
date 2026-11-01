@@ -2464,11 +2464,8 @@ function renderFamilyTabs(f, fi) {
   const tabBtns = tabs.map(t => {
     const cnt = (groups[t]||[]).length;
     const active = t === activeTab;
-    return `<button onclick="setFamilyTab(${fi},'${t}')"
-      style="padding:5px 12px;border:none;border-radius:20px;cursor:pointer;font-size:11px;
-        font-family:'Noto Sans KR',sans-serif;font-weight:600;transition:all .15s;
-        background:${active?'var(--gold)':'var(--cream)'};
-        color:${active?'#fff':'var(--muted)'}">
+    return `<button class="family-tab${active?' active':''}" onclick="setFamilyTab(${fi},'${t}')"
+      aria-pressed="${active}">
       ${t}${cnt>0?` <span style="opacity:.8">(${cnt})</span>`:''}
     </button>`;
   }).join('');
@@ -2491,15 +2488,15 @@ function renderFamilyTabs(f, fi) {
         </div>
         ${m.note?`<div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;word-break:break-all">${esc(m.note)}</div>`:''}
       </div>
-      <div style="display:flex;flex-shrink:0;gap:0">
-        <button onclick="showEditMemberModal(${fi},${mi})" style="background:none;border:none;cursor:pointer;color:var(--teal);font-size:13px;width:28px;height:28px">✏️</button>
-        <button onclick="deleteFamilyMember(${fi},${mi})" style="background:none;border:none;cursor:pointer;color:var(--rust);font-size:14px;width:28px;height:28px">×</button>
+      <div class="family-member-actions" style="display:flex;flex-shrink:0;gap:0">
+        <button class="family-member-action" onclick="showEditMemberModal(${fi},${mi})" aria-label="${esc(m.name)} 수정" style="color:var(--teal)">✏️</button>
+        <button class="family-member-action" onclick="deleteFamilyMember(${fi},${mi})" aria-label="${esc(m.name)} 삭제" style="color:var(--rust)">×</button>
       </div>
     </div>`;
   }).join('');
 
   return `
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+    <div class="family-tabs" aria-label="구성원 분류">
       ${tabBtns}
     </div>
     <div style="display:flex;flex-direction:column;gap:4px;min-height:10px" id="member-list-${fi}">

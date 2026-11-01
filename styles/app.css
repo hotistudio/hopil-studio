@@ -294,6 +294,39 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 .project-card-synopsis{color:var(--muted);font-size:12px;line-height:1.6;margin-bottom:12px;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .project-card-footer{display:flex;justify-content:space-between;align-items:center}
+
+/* 가문 및 집단: 구성원 분류와 가계도 이동 */
+.family-page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}
+.family-page-heading h2{margin:0}
+.family-page-hint{margin:7px 0 0;color:var(--muted);font-size:13px;line-height:1.5}
+.family-page-actions{display:flex;gap:8px;flex-shrink:0}
+.family-page-actions .btn{min-height:40px}
+.family-card-header{gap:12px;min-height:56px}
+.family-card-summary{min-width:0;overflow-wrap:anywhere}
+.family-card-actions{flex-shrink:0}
+.family-card-actions button{min-width:36px;min-height:36px}
+.family-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px;margin-bottom:12px}
+.family-tab{min-height:40px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--cream);color:var(--ink);font-size:13px;font-weight:700;text-align:center}
+.family-tab.active{background:var(--gold);border-color:var(--gold);color:var(--paper)}
+.family-tree-link{display:inline-flex;align-items:center;min-height:40px;padding:8px 10px;background:transparent;color:var(--teal);font-size:13px;font-weight:700;text-align:left}
+.family-tree-link:hover{background:var(--cream)}
+.family-tab:focus-visible,.family-page-actions .btn:focus-visible,.family-tree-link:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.family-member-action{width:36px;height:36px;background:transparent;font-size:16px}
+@media(max-width:900px){
+  .family-page-heading{flex-wrap:wrap}
+  .family-page-actions{margin-left:auto}
+}
+@media(max-width:600px){
+  .family-page-heading{display:block}
+  .family-page-actions{display:grid;grid-template-columns:1fr 1fr;margin-top:14px}
+  .family-page-actions .btn{width:100%;padding:8px 10px}
+  .family-card-child{margin-left:12px !important}
+  .family-card-header{flex-wrap:wrap;gap:6px !important}
+  .family-card-summary{flex:1 1 100%;gap:6px !important}
+  .family-card-actions{width:100%;justify-content:flex-end;border-top:1px solid var(--border);padding-top:4px}
+  .family-card-body{padding:0 10px 12px !important}
+  .family-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 .project-card-meta{font-size:11px;color:var(--muted)}
 
 /* ═══ EDITOR ═════════════════════════════════════════════════ */

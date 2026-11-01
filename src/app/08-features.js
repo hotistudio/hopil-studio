@@ -3708,29 +3708,37 @@ function gotoChapterFromScene(chapterId) {
   gotoChapterFromPsy(chapterId);
 }
 
+function openFamilyTreeFromCard(fi) {
+  const family = (getProject()?.families || [])[fi];
+  if (!family) return;
+  ftState.filterFamilyId = family.id || '';
+  navigate('familytree');
+}
+
 function renderFamily() {
   const p = getProject();
   const families = p.families || [];
 
   function renderFamilyCard(f, fi, isChild) {
     const collapsed = familyCollapsed['f'+fi];
+    const isFamily = ['family','korean','chinese','japanese'].includes(f.groupType || 'family');
     const totalMembers = Object.values(f.groups||{}).reduce((a,g)=>a+(g||[]).length,0);
     const roots = families.filter(x=>!x.parentName);
     const rootIdx = roots.indexOf(f);
     const isFirst = isChild ? false : rootIdx === 0;
     const isLast = isChild ? false : rootIdx === roots.length - 1;
     return `
-      <div style="margin-bottom:${isChild?'6':'12'}px;
+      <div class="family-card${isChild?' family-card-child':''}" style="margin-bottom:${isChild?'6':'12'}px;
         margin-left:${isChild?'24':'0'}px;
         border-left:${isChild?'3':'4'}px solid ${f.color||'var(--gold)'};
         border-radius:10px;background:var(--paper);overflow:hidden;
         ${isChild?'box-shadow:none;border-top:1px solid var(--border);border-right:1px solid var(--border);border-bottom:1px solid var(--border)':'box-shadow:0 1px 4px var(--shadow)'}">
         ${isChild?`<div style="padding:4px 12px;background:${f.color||'var(--gold)'};opacity:0.15;height:3px"></div>`:''}
-        <div style="display:flex;justify-content:space-between;align-items:center;
+        <div class="family-card-header" style="display:flex;justify-content:space-between;align-items:center;
           padding:${isChild?'8':'10'}px 14px;cursor:pointer;
           ${isChild?`background:${f.color||'#c4922a'}18`:''}"
           onclick="toggleFamilyCard(${fi})">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div class="family-card-summary" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             ${isChild?`<span style="font-size:12px;color:${f.color||'var(--gold)'};font-weight:700">└</span>`:''}
             <span style="font-size:11px;color:var(--muted);transition:transform .2s;display:inline-block;transform:rotate(${collapsed?'-90':'0'}deg)">▾</span>
             <span class="font-display" style="font-size:${isChild?'15':'17'}px">${esc(f.name)}</span>
@@ -3738,7 +3746,7 @@ function renderFamily() {
             ${f.rank?`<span class="tag">${esc(f.rank)}</span>`:''}
             ${totalMembers>0?`<span style="font-size:11px;color:var(--muted)">${totalMembers}명</span>`:''}
           </div>
-          <div style="display:flex;gap:4px;align-items:center" onclick="event.stopPropagation()">
+          <div class="family-card-actions" style="display:flex;gap:4px;align-items:center" onclick="event.stopPropagation()">
             ${!isChild?`
             <button onclick="moveFamilyCard(${fi},-1)"
               style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:4px;opacity:${isFirst?'.2':'1'};pointer-events:${isFirst?'none':'auto'}">▲</button>
@@ -3751,10 +3759,11 @@ function renderFamily() {
           </div>
         </div>
         ${collapsed ? '' : `
-        <div style="padding:0 14px 12px">
+        <div class="family-card-body" style="padding:0 14px 12px">
           ${f.description?`<div style="font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.7">${esc(f.description)}</div>`:''}
           <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
             ${renderFamilyTabs(f, fi)}
+            ${isFamily ? `<button class="family-tree-link" onclick="openFamilyTreeFromCard(${fi})">이 가문의 가계도 보기 →</button>` : ''}
           </div>
         </div>`}
       </div>`;
@@ -3778,12 +3787,18 @@ function renderFamily() {
 
   document.getElementById('main').innerHTML = `
     <div style="max-width:780px;margin:0 auto">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px">
-        <h2 class="font-display" style="font-size:22px">가문 및 집단 (${families.length})</h2>
-        <button class="btn btn-gold" onclick="showFamilyModal()">
+      <div class="family-page-heading">
+        <div>
+          <h2 class="font-display" style="font-size:22px">가문 및 집단 (${families.length})</h2>
+          <p class="family-page-hint">가문을 펼치면 직계·방계 구성원을 볼 수 있습니다.</p>
+        </div>
+        <div class="family-page-actions">
+          <button class="btn btn-outline" onclick="ftState.filterFamilyId='';navigate('familytree')">전체 가계도</button>
+          <button class="btn btn-gold" onclick="showFamilyModal()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           추가
-        </button>
+          </button>
+        </div>
       </div>
       ${familyCards}
     </div>`;
