@@ -185,6 +185,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 #header-title{font-family:'Pretendard Variable','Pretendard','Noto Sans KR',sans-serif;
   font-size:16px;font-weight:700;color:var(--header-fg);
   letter-spacing:-.02em;cursor:pointer;white-space:nowrap;background:none;border:none;padding:0;flex-shrink:0}
+#header-title .header-brand-compact{display:none}
 #header-project{font-size:13px;color:var(--header-fg-soft);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
 #header-spacer{flex:1}
@@ -804,9 +805,11 @@ button.stats-heatmap-day:focus-visible{outline:2px solid var(--gold);outline-off
 
 /* ═══ RESPONSIVE ════════════════════════════════════════════ */
 @media (max-width: 520px) {
-  header { padding:0 8px; gap:4px; }
-  #header-title { font-size:13px; letter-spacing:0; }
-  #header-title span { font-size:8px; }
+  #header { padding:0 8px; gap:4px; }
+  #header-title { font-size:14px; letter-spacing:0; }
+  #header-title .header-brand-full,#header-title .header-version{display:none}
+  #header-title .header-brand-compact{display:inline}
+  #header-sep,#file-status{display:none !important}
   .header-btn { padding:5px 8px; font-size:11px; }
   #btn-darkmode { padding:0; }
   .btn-text { display:none; }
