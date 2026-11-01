@@ -2,6 +2,7 @@
 // ═══════════════════════════════════════════════════════════════
 loadFromStorage();
 migrateAllProjects();
+migrateLegacyWritingGoals();
 initDarkMode();
 initColorTheme();
 applyEditorFontSize();

@@ -362,6 +362,12 @@ function renderOverview() {
                 </div>
               </div>
               <div>
+                <label class="label" for="ov-daily-writing-goal">하루 목표 집필량</label>
+                <input id="ov-daily-writing-goal" type="number" min="100" step="100" value="${getWritingGoal()}"
+                  onchange="setWritingGoal(this.value);this.value=getWritingGoal()" aria-describedby="ov-daily-writing-goal-hint">
+                <div id="ov-daily-writing-goal-hint" style="font-size:11px;color:var(--muted);margin-top:5px">집필 통계의 오늘 목표와 연동돼요.</div>
+              </div>
+              <div>
                 <label class="label">회차당 목표 분량</label>
                 <input value="${esc(p.routineGoal||'')}" placeholder="예: 6,000자" oninput="updateProject('routineGoal',this.value)">
               </div>

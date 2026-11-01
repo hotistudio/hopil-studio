@@ -1707,7 +1707,8 @@ function enterFocusMode() {
     if (ch2) {
       const diff = writtenCharDelta(ch2.content || '', focusEditor.value, event);
       ch2.content = focusEditor.value;
-      if (diff > 0) { recordDailyWriting(diff); onTypingKey(); }
+      if (diff > 0) recordDailyWriting(diff);
+      if (isWritingActivityInput(event)) onTypingKey();
       autoSave();
     }
   };

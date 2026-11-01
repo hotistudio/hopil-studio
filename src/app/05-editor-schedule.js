@@ -390,7 +390,7 @@ function onEditorInput(id, val, inputEvent) {
   // 날짜별 집필량 기록
   const diff = writtenCharDelta(previous, val, inputEvent);
   if (diff > 0) recordDailyWriting(diff);
-  if (diff > 0) onTypingKey();
+  if (isWritingActivityInput(inputEvent)) onTypingKey();
   // debounce save
   clearTimeout(window._saveTimer);
   window._saveTimer = setTimeout(() => { autoSave(); updateChapterListItem(ch); }, 800);

@@ -24,6 +24,8 @@ assert.equal(vm.runInContext('getTodayStr(new Date(2026, 9, 28, 0, 30))', contex
 assert.equal(vm.runInContext("writtenCharDelta('글', '글자', {inputType:'insertText'})", context), 1);
 assert.equal(vm.runInContext("writtenCharDelta('글', '글자', {inputType:'insertFromPaste'})", context), 0);
 assert.equal(vm.runInContext("writtenCharDelta('글', '글자', {inputType:'historyRedo'})", context), 0);
+assert.equal(vm.runInContext("isWritingActivityInput({inputType:'deleteContentBackward'})", context), true);
+assert.equal(vm.runInContext("isWritingActivityInput({inputType:'insertFromPaste'})", context), false);
 
 store.set('hopil_studio_writing_stats', JSON.stringify({ p1: { '2026-10-28': 123 } }));
 store.set('hopil_studio_typing_stats', JSON.stringify({ p1: { '2026-10-28': 45 } }));

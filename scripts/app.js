@@ -1948,6 +1948,12 @@ function renderOverview() {
                 </div>
               </div>
               <div>
+                <label class="label" for="ov-daily-writing-goal">하루 목표 집필량</label>
+                <input id="ov-daily-writing-goal" type="number" min="100" step="100" value="${getWritingGoal()}"
+                  onchange="setWritingGoal(this.value);this.value=getWritingGoal()" aria-describedby="ov-daily-writing-goal-hint">
+                <div id="ov-daily-writing-goal-hint" style="font-size:11px;color:var(--muted);margin-top:5px">집필 통계의 오늘 목표와 연동돼요.</div>
+              </div>
+              <div>
                 <label class="label">회차당 목표 분량</label>
                 <input value="${esc(p.routineGoal||'')}" placeholder="예: 6,000자" oninput="updateProject('routineGoal',this.value)">
               </div>
@@ -3710,7 +3716,7 @@ function onEditorInput(id, val, inputEvent) {
   // 날짜별 집필량 기록
   const diff = writtenCharDelta(previous, val, inputEvent);
   if (diff > 0) recordDailyWriting(diff);
-  if (diff > 0) onTypingKey();
+  if (isWritingActivityInput(inputEvent)) onTypingKey();
   // debounce save
   clearTimeout(window._saveTimer);
   window._saveTimer = setTimeout(() => { autoSave(); updateChapterListItem(ch); }, 800);
@@ -7191,7 +7197,8 @@ function enterFocusMode() {
     if (ch2) {
       const diff = writtenCharDelta(ch2.content || '', focusEditor.value, event);
       ch2.content = focusEditor.value;
-      if (diff > 0) { recordDailyWriting(diff); onTypingKey(); }
+      if (diff > 0) recordDailyWriting(diff);
+      if (isWritingActivityInput(event)) onTypingKey();
       autoSave();
     }
   };
@@ -8661,6 +8668,10 @@ function writtenCharDelta(before, after, inputEvent) {
   if (!['insertText', 'insertCompositionText', 'insertLineBreak', 'insertParagraph'].includes(type)) return 0;
   return Math.max(0, after.length - before.length);
 }
+function isWritingActivityInput(inputEvent) {
+  const type = inputEvent?.inputType || '';
+  return ['insertText', 'insertCompositionText', 'insertLineBreak', 'insertParagraph'].includes(type) || type.startsWith('delete');
+}
 function recordDailyWriting(chars) {
   const stats = loadStats();
   const pid = state.activeProjectId;
@@ -8722,11 +8733,31 @@ function launchConfetti() {
   }
   draw();
 }
+function migrateLegacyWritingGoals() {
+  const legacyGoal = Number(localStorage.getItem('hopil_studio_goal'));
+  if (!Number.isFinite(legacyGoal) || legacyGoal < 100 || !Array.isArray(state.projects)) return;
+  let changed = false;
+  for (const project of state.projects) {
+    if (!project || Number(project.dailyWritingGoal) >= 100) continue;
+    project.dailyWritingGoal = Math.round(legacyGoal);
+    changed = true;
+  }
+  if (changed) saveToStorage();
+}
 function getWritingGoal() {
-  try { return parseInt(localStorage.getItem('hopil_studio_goal') || '1000'); } catch(e) { return 1000; }
+  const projectGoal = Number(getProject()?.dailyWritingGoal);
+  if (Number.isFinite(projectGoal) && projectGoal >= 100) return Math.round(projectGoal);
+  try {
+    const legacyGoal = Number(localStorage.getItem('hopil_studio_goal'));
+    return Number.isFinite(legacyGoal) && legacyGoal >= 100 ? Math.round(legacyGoal) : 1000;
+  } catch(e) { return 1000; }
 }
 function setWritingGoal(n) {
-  localStorage.setItem('hopil_studio_goal', String(n));
+  const project = getProject();
+  if (!project) return;
+  const goal = Number(n);
+  project.dailyWritingGoal = Number.isFinite(goal) && goal >= 100 ? Math.round(goal) : 1000;
+  autoSave();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -8827,6 +8858,81 @@ function resetSessionTyping() {
   if (el) el.textContent = '0분 0초';
 }
 
+const STATS_PERIOD_KEY = 'hopil_studio_stats_period';
+function getStatsPeriod() {
+  return localStorage.getItem(STATS_PERIOD_KEY) === 'year' ? 'year' : 'weeks';
+}
+function setStatsPeriod(period) {
+  if (period !== 'weeks' && period !== 'year') return;
+  localStorage.setItem(STATS_PERIOD_KEY, period);
+  renderStats();
+}
+function getWritingStreak(days, now = new Date()) {
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const throughYesterday = !(days[getTodayStr(date)] > 0);
+  if (throughYesterday) date.setDate(date.getDate() - 1);
+  let count = 0;
+  const limit = Object.keys(days).length;
+  while (count < limit && days[getTodayStr(date)] > 0) {
+    count++;
+    date.setDate(date.getDate() - 1);
+  }
+  return { count, throughYesterday: throughYesterday && count > 0 };
+}
+function getMonthlyWritingStats(days, now = new Date()) {
+  const today = getTodayStr(now);
+  const first = Object.keys(days).filter(key => /^\d{4}-\d{2}-\d{2}$/.test(key) && key <= today && days[key] > 0).sort()[0];
+  const start = first ? new Date(Number(first.slice(0,4)), Number(first.slice(5,7))-1, 1) : new Date(now.getFullYear(), now.getMonth(), 1);
+  const totals = {};
+  for (const [key, amount] of Object.entries(days)) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(key) && key <= today && Number.isFinite(amount) && amount > 0) totals[key.slice(0,7)] = (totals[key.slice(0,7)] || 0) + amount;
+  }
+  const months = [];
+  for (const date = start; date <= now; date.setMonth(date.getMonth() + 1)) {
+    const key = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+    months.push({ label:`${date.getFullYear()}/${date.getMonth()+1}월`, total:totals[key] || 0 });
+  }
+  return months;
+}
+function buildWritingHeatmap(days, goal, period, now = new Date()) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const start = new Date(today);
+  if (period === 'year') start.setDate(start.getDate() - 364);
+  else {
+    start.setDate(start.getDate() - (start.getDay() + 6) % 7 - 11 * 7);
+  }
+  const firstMonday = new Date(start);
+  firstMonday.setDate(firstMonday.getDate() - (firstMonday.getDay() + 6) % 7);
+  const columns = [];
+  const months = [];
+  for (const week = new Date(firstMonday); week <= today; week.setDate(week.getDate() + 7)) {
+    const column = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(week);
+      day.setDate(day.getDate() + i);
+      if (day < start || day > today) { column.push('<span class="stats-heatmap-day is-empty" aria-hidden="true"></span>'); continue; }
+      const key = getTodayStr(day);
+      const amount = Number.isFinite(Number(days[key])) ? Math.max(0, Number(days[key])) : 0;
+      const level = amount > 0 ? Math.min(4, Math.ceil(amount / goal * 4)) : 0;
+      column.push(`<button type="button" class="stats-heatmap-day${key === getTodayStr(today) ? ' is-today' : ''}" data-level="${level}" title="${key}: ${amount.toLocaleString()}자" aria-label="${key}, ${amount.toLocaleString()}자" onclick="showStatsDay('${key}',${amount})"></button>`);
+    }
+    const firstOfMonth = Array.from({length:7}, (_, i) => { const day = new Date(week); day.setDate(day.getDate()+i); return day; }).find(day => day.getDate() === 1 && day >= start && day <= today);
+    if (columns.length === 0 || firstOfMonth) {
+      const date = firstOfMonth || start;
+      months.push(`<span style="left:${columns.length * 19}px">${date.getMonth()+1}월</span>`);
+    }
+    columns.push(`<div class="stats-heatmap-week${firstOfMonth && columns.length ? ' is-month-start' : ''}">${column.join('')}</div>`);
+  }
+  return `<div class="stats-heatmap" style="width:${columns.length * 19 - 3}px">
+    <div class="stats-heatmap-months">${months.join('')}</div>
+    <div class="stats-heatmap-grid">${columns.join('')}</div>
+  </div>`;
+}
+function showStatsDay(date, amount) {
+  const detail = document.getElementById('stats-day-detail');
+  if (detail) detail.textContent = `${date} · 직접 입력 ${amount.toLocaleString()}자`;
+}
+
 function renderStats() {
   const p = getProject();
   if (!p) return;
@@ -8837,55 +8943,10 @@ function renderStats() {
   const todayCount = pStats[today] || 0;
   const goal = getWritingGoal();
   const goalPct = Math.min(100, Math.round(todayCount / goal * 100));
-
-  // streak 계산
-  let streak = 0;
-  const d = new Date();
-  for (let i = 0; i < 365; i++) {
-    const key = getTodayStr(d);
-    if ((pStats[key] || 0) > 0) { streak++; d.setDate(d.getDate() - 1); }
-    else break;
-  }
-
-  // 히트맵 (8주)
-  const weeks = 12;
-  const days = weeks * 7;
-  const maxVal = Math.max(...Object.values(pStats).filter(v => v > 0), 1);
-  const colors = ['var(--cream)','#c6e48b','#7bc96f','#239a3b','#196127'];
-  // 7행 × 12열 — 오늘(왼쪽 위), 아래로 날짜 증가(과거), 열 넘어가면 다음 열
-  let calRows = '';
-  for (let row = 0; row < 7; row++) {
-    let rowHtml = '';
-    for (let col = 0; col < weeks; col++) {
-      const idx = col * 7 + row;
-      const dd = new Date();
-      dd.setDate(dd.getDate() - idx);
-      const key = getTodayStr(dd);
-      const val = pStats[key] || 0;
-      const intensity = val === 0 ? 0 : Math.ceil((val / maxVal) * 4);
-      const isToday = key === today;
-      rowHtml += `<div title="${key}: ${val.toLocaleString()}자" style="width:16px;height:16px;border-radius:3px;background:${colors[intensity]};${isToday?'outline:2px solid var(--gold);outline-offset:1px':''}"></div>`;
-    }
-    calRows += `<div style="display:flex;gap:3px">${rowHtml}</div>`;
-  }
-
-  // 월별 통계 (2026년 3월부터 현재까지)
-  const startYear = 2026, startMonth = 2; // 0-indexed: 2 = 3월
-  const nowDate = new Date();
-  const monthStats = [];
-  let my = startYear, mm = startMonth;
-  while (my < nowDate.getFullYear() || (my === nowDate.getFullYear() && mm <= nowDate.getMonth())) {
-    const label = `${my}/${mm+1}월`;
-    let total = 0;
-    const daysInMonth = new Date(my, mm+1, 0).getDate();
-    for (let d2 = 1; d2 <= daysInMonth; d2++) {
-      const key = `${my}-${String(mm+1).padStart(2,'0')}-${String(d2).padStart(2,'0')}`;
-      total += pStats[key] || 0;
-    }
-    monthStats.push({ label, total });
-    mm++;
-    if (mm > 11) { mm = 0; my++; }
-  }
+  const streak = getWritingStreak(pStats);
+  const period = getStatsPeriod();
+  const heatmap = buildWritingHeatmap(pStats, goal, period);
+  const monthStats = getMonthlyWritingStats(pStats);
   const maxMonth = Math.max(...monthStats.map(m => m.total), 1);
 
   // 최근 30일 합산
@@ -8906,7 +8967,7 @@ function renderStats() {
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
+      <div class="stats-summary">
         <div class="card card-sm" style="text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:6px">오늘 쓴 글자</div>
           <div class="font-display" style="font-size:28px;color:var(--gold)">${todayCount.toLocaleString()}</div>
@@ -8914,8 +8975,8 @@ function renderStats() {
         </div>
         <div class="card card-sm" style="text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:6px">연속 집필</div>
-          <div class="font-display" style="font-size:28px;color:var(--teal)">${streak}</div>
-          <div style="font-size:11px;color:var(--muted)">일째 🔥</div>
+          <div class="font-display" style="font-size:28px;color:var(--teal)">${streak.count}</div>
+          <div style="font-size:11px;color:var(--muted)">${streak.throughYesterday ? '어제까지 연속' : '일 연속 집필'}</div>
         </div>
         <div class="card card-sm" style="text-align:center">
           <div style="font-size:11px;color:var(--muted);margin-bottom:6px">최근 30일</div>
@@ -8924,10 +8985,10 @@ function renderStats() {
         </div>
       </div>
 
-      <!-- 타이핑 시간 카드 -->
+      <!-- 집필 활동 시간 카드 -->
       <div class="card card-sm" style="margin-bottom:20px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <span style="font-weight:700;font-size:13px">⌨️ 순수 타이핑 시간</span>
+          <span style="font-weight:700;font-size:13px">⌨️ 집필 활동 시간</span>
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:11px;color:var(--muted)">유휴 간격</span>
             <input type="number" id="typing-gap-input" value="${getTypingGap()}" min="1" max="30" step="1"
@@ -8951,17 +9012,17 @@ function renderStats() {
           </div>
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
-          💡 키를 입력하다 <b>${getTypingGap()}초</b> 이상 멈추면 타이핑이 끊긴 것으로 간주해요
+          입력·삭제 후 최대 <b>${getTypingGap()}초</b>의 멈춤까지 포함해요. 기존 기록도 같은 기준으로 표시합니다.
         </div>
       </div>
 
       <div class="card card-sm" style="margin-bottom:20px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <span style="font-weight:700;font-size:13px">오늘 목표</span>
+          <span style="font-weight:700;font-size:13px">이 작품의 하루 목표</span>
           <div style="display:flex;align-items:center;gap:8px">
             <input type="number" id="goal-input" value="${goal}" min="100" step="100"
               style="width:90px;text-align:right;font-size:13px;padding:4px 8px"
-              onchange="setWritingGoal(parseInt(this.value)||1000);renderStats()">
+              onchange="setWritingGoal(this.value);renderStats()">
             <span style="font-size:12px;color:var(--muted)">자</span>
           </div>
         </div>
@@ -8977,21 +9038,29 @@ function renderStats() {
       </div>
 
       <div class="card card-sm">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+        <div class="stats-charts${period === 'year' ? ' stats-charts-year' : ''}">
           <!-- 달력 히트맵 -->
-          <div>
-            <div style="font-weight:700;font-size:12px;margin-bottom:10px;color:var(--muted)">📅 최근 ${weeks}주</div>
-            <div style="display:flex;flex-direction:column;gap:3px">
-              ${calRows}
+          <div class="stats-chart-panel">
+            <div class="stats-heatmap-heading">
+              <strong>📅 집필 기록</strong>
+              <div class="stats-period-toggle" role="group" aria-label="집필 기록 기간">
+                <button type="button" class="${period === 'weeks' ? 'active' : ''}" aria-pressed="${period === 'weeks'}" onclick="setStatsPeriod('weeks')">12주</button>
+                <button type="button" class="${period === 'year' ? 'active' : ''}" aria-pressed="${period === 'year'}" onclick="setStatsPeriod('year')">1년</button>
+              </div>
+            </div>
+            <div id="stats-day-detail" class="stats-day-detail" aria-live="polite">날짜를 선택하면 글자 수를 볼 수 있어요.</div>
+            <div class="stats-heatmap-scroll" aria-label="최근 ${period === 'year' ? '1년' : '12주'} 집필 기록, 가로로 스크롤할 수 있습니다" tabindex="0">
+              ${heatmap}
             </div>
             <div style="display:flex;align-items:center;gap:4px;margin-top:8px">
               <span style="font-size:10px;color:var(--muted)">적음</span>
-              ${colors.map(c=>`<div style="width:12px;height:12px;border-radius:2px;background:${c}"></div>`).join('')}
+              ${[0,1,2,3,4].map(level=>`<span class="stats-heatmap-day stats-legend-day" data-level="${level}" aria-hidden="true"></span>`).join('')}
               <span style="font-size:10px;color:var(--muted)">많음</span>
             </div>
+            <div style="font-size:10px;color:var(--muted);margin-top:5px">색 진하기는 현재 하루 목표 대비 집필량을 나타내요.</div>
           </div>
           <!-- 월별 통계 -->
-          <div>
+          <div class="stats-chart-panel">
             <div style="font-weight:700;font-size:12px;margin-bottom:10px;color:var(--muted)">📊 월별 글자 수</div>
             ${monthStats.map(m => `
               <div style="margin-bottom:7px">
@@ -9007,6 +9076,10 @@ function renderStats() {
         </div>
       </div>
     </div>`;
+  if (period === 'year') {
+    const scroll = document.querySelector('.stats-heatmap-scroll');
+    if (scroll) scroll.scrollLeft = scroll.scrollWidth - scroll.clientWidth;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -12543,6 +12616,7 @@ async function exportHwpx(chId) {
 // ═══════════════════════════════════════════════════════════════
 loadFromStorage();
 migrateAllProjects();
+migrateLegacyWritingGoals();
 initDarkMode();
 initColorTheme();
 applyEditorFontSize();
