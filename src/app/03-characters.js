@@ -322,7 +322,7 @@ function renderCharRelationTab(idx) {
 
       <div>
         <label class="label">추가 관계</label>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">이 관계는 인물 관계도에도 표시되며 가계도 배치는 바꾸지 않습니다. 스승·주군·짝사랑은 앞 사람에서 뒤 사람 방향입니다.</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">이 관계는 인물 관계망에도 표시되며 가계도 배치는 바꾸지 않습니다. 스승·주군·짝사랑은 앞 사람에서 뒤 사람 방향입니다.</div>
         ${narrativeRelations.length ? narrativeRelations.map(({ r, i }) => `
           <div style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">
             <span style="min-width:0;overflow-wrap:anywhere">${esc(relationName(p, r, 'from'))} → ${esc(r.type)} → ${esc(relationName(p, r, 'to'))}</span>
@@ -707,6 +707,196 @@ function saveRelationData(p, fromId, toId, type, editIndex = -1) {
   return '';
 }
 
+const relationNetworkState = {
+  showFamily: true, showExtra: true, type: '', selectedId: null,
+  zoom: 1, panX: 0, panY: 0, layoutKey: '', layout: null,
+};
+
+function relationNetworkEdges(p) {
+  const chars = p.characters || [];
+  const ids = new Set(chars.map(c => String(c.id)));
+  const edges = [];
+  const spousePairs = new Set();
+  chars.forEach(c => {
+    (c.parents || []).forEach(parentId => {
+      if (ids.has(String(parentId))) edges.push({ from: String(parentId), to: String(c.id), type: '부모', group: 'family', directed: true });
+    });
+    (c.spouses || []).forEach(sp => {
+      if (!ids.has(String(sp.charId))) return;
+      const pair = [String(c.id), String(sp.charId)].sort().join('|');
+      if (spousePairs.has(pair)) return;
+      spousePairs.add(pair);
+      edges.push({ from: String(c.id), to: String(sp.charId), type: sp.status === 'past' ? '전 배우자' : sp.status === 'deceased' ? '사별' : '배우자', group: 'family', directed: false });
+    });
+  });
+  (p.relations || []).forEach(r => {
+    if (ids.has(String(r.fromId)) && ids.has(String(r.toId))) {
+      edges.push({ from: String(r.fromId), to: String(r.toId), type: r.type || '관계', group: 'extra', directed: (r.type || '').includes('→') });
+    }
+  });
+  return edges;
+}
+
+function relationNetworkLayout(chars, edges, width, height) {
+  const positions = new Map();
+  if (!chars.length) return positions;
+  if (chars.length === 1) { positions.set(String(chars[0].id), { x: width / 2, y: height / 2 }); return positions; }
+  const radius = Math.min(width * .38, height * .38);
+  chars.forEach((c, i) => {
+    const angle = 2 * Math.PI * i / chars.length - Math.PI / 2;
+    positions.set(String(c.id), { x: width / 2 + radius * Math.cos(angle), y: height / 2 + radius * Math.sin(angle) });
+  });
+  if (chars.length < 3) return positions;
+  const minDistance = width < 520 ? 100 : 130;
+  const desired = Math.min(185, Math.max(125, Math.sqrt(width * height / chars.length) * .8));
+  for (let step = 0; step < 100; step++) {
+    const forces = new Map(chars.map(c => [String(c.id), { x: 0, y: 0 }]));
+    for (let i = 0; i < chars.length; i++) for (let j = i + 1; j < chars.length; j++) {
+      const a = String(chars[i].id), b = String(chars[j].id);
+      const pa = positions.get(a), pb = positions.get(b);
+      const dx = pa.x - pb.x || .01, dy = pa.y - pb.y || .01;
+      const dist = Math.max(1, Math.hypot(dx, dy));
+      const strength = Math.min(14, (minDistance * minDistance * 1.8) / (dist * dist));
+      forces.get(a).x += dx / dist * strength; forces.get(a).y += dy / dist * strength;
+      forces.get(b).x -= dx / dist * strength; forces.get(b).y -= dy / dist * strength;
+    }
+    edges.forEach(e => {
+      const a = positions.get(e.from), b = positions.get(e.to);
+      if (!a || !b) return;
+      const dx = b.x - a.x, dy = b.y - a.y, dist = Math.max(1, Math.hypot(dx, dy));
+      const strength = Math.max(-5, Math.min(5, (dist - desired) * .035));
+      forces.get(e.from).x += dx / dist * strength; forces.get(e.from).y += dy / dist * strength;
+      forces.get(e.to).x -= dx / dist * strength; forces.get(e.to).y -= dy / dist * strength;
+    });
+    chars.forEach(c => {
+      const id = String(c.id), pos = positions.get(id), force = forces.get(id);
+      pos.x = Math.max(65, Math.min(width - 65, pos.x + force.x + (width / 2 - pos.x) * .006));
+      pos.y = Math.max(36, Math.min(height - 36, pos.y + force.y + (height / 2 - pos.y) * .006));
+    });
+  }
+  return positions;
+}
+
+function setRelationNetworkFilter(name, value) {
+  if (name === 'type') relationNetworkState.type = value;
+  else if (name === 'family') relationNetworkState.showFamily = value;
+  else if (name === 'extra') relationNetworkState.showExtra = value;
+  drawRelationNetwork();
+}
+
+function selectRelationNetworkNode(id) {
+  relationNetworkState.selectedId = relationNetworkState.selectedId === id ? null : id;
+  drawRelationNetwork();
+}
+
+function zoomRelationNetwork(factor) {
+  const svg = document.getElementById('rn-svg');
+  const previous = relationNetworkState.zoom;
+  const next = Math.max(.55, Math.min(2.5, previous * factor));
+  if (svg) {
+    const ratio = next / previous;
+    relationNetworkState.panX = (svg.clientWidth || 800) / 2 * (1 - ratio) + relationNetworkState.panX * ratio;
+    relationNetworkState.panY = (svg.clientHeight || 480) / 2 * (1 - ratio) + relationNetworkState.panY * ratio;
+  }
+  relationNetworkState.zoom = next;
+  drawRelationNetwork();
+}
+
+function resetRelationNetworkView() {
+  relationNetworkState.zoom = 1;
+  relationNetworkState.panX = relationNetworkState.panY = 0;
+  drawRelationNetwork();
+}
+
+function drawRelationNetwork() {
+  const svg = document.getElementById('rn-svg');
+  const detail = document.getElementById('rn-detail');
+  if (!svg || !detail) return;
+  const p = getProject();
+  const chars = p.characters || [];
+  const allEdges = relationNetworkEdges(p);
+  const edges = allEdges.filter(e => e.group === 'family' ? relationNetworkState.showFamily : relationNetworkState.showExtra && (!relationNetworkState.type || e.type === relationNetworkState.type));
+  const width = Math.max(280, svg.clientWidth || 800), height = Math.max(360, svg.clientHeight || 480);
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  if (!chars.length) {
+    svg.innerHTML = `<text x="50%" y="50%" text-anchor="middle" fill="var(--muted)">등장인물을 추가하면 관계망이 나타납니다.</text>`;
+    detail.innerHTML = '';
+    return;
+  }
+  const layoutKey = `${width}:${height}:${chars.map(c => c.id).join(',')}:${edges.map(e => `${e.from}-${e.to}-${e.type}`).join(',')}`;
+  if (relationNetworkState.layoutKey !== layoutKey) {
+    relationNetworkState.layout = relationNetworkLayout(chars, edges, width, height);
+    relationNetworkState.layoutKey = layoutKey;
+  }
+  const positions = relationNetworkState.layout;
+  const selected = relationNetworkState.selectedId;
+  const pairCounts = new Map();
+  const paths = edges.map(e => {
+    const a = positions.get(e.from), b = positions.get(e.to);
+    if (!a || !b) return '';
+    const key = [e.from, e.to].sort().join('|');
+    const index = pairCounts.get(key) || 0;
+    pairCounts.set(key, index + 1);
+    const dx = b.x - a.x, dy = b.y - a.y, length = Math.max(1, Math.hypot(dx, dy));
+    const offset = index ? (Math.ceil(index / 2) * 28 * (index % 2 ? 1 : -1)) : 0;
+    const midX = (a.x + b.x) / 2 - dy / length * offset;
+    const midY = (a.y + b.y) / 2 + dx / length * offset;
+    const active = !selected || selected === e.from || selected === e.to;
+    const color = e.group === 'family' ? 'var(--gold)' : 'var(--teal)';
+    return `<g class="rn-edge${active ? '' : ' dim'}"><path d="M ${a.x} ${a.y} Q ${midX * 2 - (a.x + b.x) / 2} ${midY * 2 - (a.y + b.y) / 2} ${b.x} ${b.y}" fill="none" stroke="${color}" stroke-width="${active ? 2.4 : 1.4}" ${e.group === 'extra' ? 'stroke-dasharray="6 4"' : ''}/><rect x="${midX - Math.max(22, e.type.length * 6 + 7)}" y="${midY - 11}" width="${Math.max(44, e.type.length * 12 + 14)}" height="22" rx="10" class="rn-edge-label-bg"/><text x="${midX}" y="${midY + 4}" text-anchor="middle" class="rn-edge-label">${esc(e.type)}${e.directed ? ' →' : ''}</text></g>`;
+  }).join('');
+  const nodes = chars.map(c => {
+    const pos = positions.get(String(c.id));
+    const active = !selected || selected === String(c.id) || edges.some(e => (e.from === selected && e.to === String(c.id)) || (e.to === selected && e.from === String(c.id)));
+    return `<g class="rn-node${selected === String(c.id) ? ' selected' : ''}${active ? '' : ' dim'}" data-id="${esc(c.id)}" transform="translate(${pos.x},${pos.y})" tabindex="0" role="button" aria-label="${esc(c.name)} 관계 보기"><rect x="-54" y="-25" width="108" height="50" rx="12"/><text text-anchor="middle" y="-1" class="rn-node-name">${esc(c.name.length > 9 ? c.name.slice(0, 8) + '…' : c.name)}</text><text text-anchor="middle" y="16" class="rn-node-role">${esc((c.role || '').length > 12 ? c.role.slice(0, 11) + '…' : c.role || '')}</text></g>`;
+  }).join('');
+  svg.innerHTML = `<g transform="translate(${relationNetworkState.panX},${relationNetworkState.panY}) scale(${relationNetworkState.zoom})">${paths}${nodes}</g>`;
+  const person = chars.find(c => String(c.id) === selected);
+  if (!person) {
+    detail.innerHTML = `<span>인물을 선택하면 연결된 관계가 강조됩니다.</span><span>${chars.length}명 · 표시된 연결 ${edges.length}개</span>`;
+  } else {
+    const connected = edges.filter(e => e.from === selected || e.to === selected);
+    detail.innerHTML = `<strong>${esc(person.name)}</strong>${connected.length ? connected.map(e => {
+      const other = chars.find(c => String(c.id) === (e.from === selected ? e.to : e.from));
+      return `<span class="rn-detail-chip">${e.from === selected ? '→' : '←'} ${esc(e.type)} · ${esc(other?.name || '알 수 없음')}</span>`;
+    }).join('') : '<span>표시된 관계가 없습니다.</span>'}`;
+  }
+}
+
+function setupRelationNetwork() {
+  const svg = document.getElementById('rn-svg');
+  if (!svg) return;
+  let drag = null;
+  svg.addEventListener('pointerdown', e => {
+    if (e.target.closest('.rn-node')) return;
+    drag = { x: e.clientX, y: e.clientY, panX: relationNetworkState.panX, panY: relationNetworkState.panY };
+    svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener('pointermove', e => {
+    if (!drag) return;
+    relationNetworkState.panX = drag.panX + e.clientX - drag.x;
+    relationNetworkState.panY = drag.panY + e.clientY - drag.y;
+    drawRelationNetwork();
+  });
+  svg.addEventListener('pointerup', () => { drag = null; });
+  svg.addEventListener('pointercancel', () => { drag = null; });
+  svg.addEventListener('lostpointercapture', () => { drag = null; });
+  svg.addEventListener('click', e => {
+    const node = e.target.closest('.rn-node');
+    if (node) selectRelationNetworkNode(node.dataset.id);
+  });
+  svg.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const node = e.target.closest('.rn-node');
+    if (node) { e.preventDefault(); selectRelationNetworkNode(node.dataset.id); }
+  });
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomRelationNetwork(e.deltaY < 0 ? 1.1 : 1 / 1.1);
+  }, { passive: false });
+  drawRelationNetwork();
+}
+
 function renderRelations(preserveEdit = false) {
   const p = getProject();
   if (!preserveEdit || relationEditIndex >= (p.relations || []).length) relationEditIndex = -1;
@@ -715,6 +905,8 @@ function renderRelations(preserveEdit = false) {
   const rels = p.relations || [];
   const editing = rels[relationEditIndex];
   const charOpts = selectedId => relationCharacterOptions(chars, selectedId);
+  const networkTypes = [...new Set(rels.map(r => r.type).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+  if (relationNetworkState.type && !networkTypes.includes(relationNetworkState.type)) relationNetworkState.type = '';
 
   const relList = rels.length === 0
     ? `<div style="text-align:center;padding:32px;color:var(--muted)">관계를 추가해보세요.</div>`
@@ -731,14 +923,24 @@ function renderRelations(preserveEdit = false) {
       </div>`).join('');
 
   document.getElementById('main').innerHTML = `
-    <div style="max-width:780px;margin:0 auto">
-      <div class="font-display" style="font-size:22px;margin-bottom:22px">인물 관계도</div>
+    <div style="max-width:1100px;margin:0 auto">
+      <div class="font-display" style="font-size:22px;margin-bottom:16px">인물 관계망</div>
+      <div class="card rn-card">
+        <div class="rn-toolbar">
+          <label><input type="checkbox" ${relationNetworkState.showFamily ? 'checked' : ''} onchange="setRelationNetworkFilter('family',this.checked)"> 가족 연결</label>
+          <label><input type="checkbox" ${relationNetworkState.showExtra ? 'checked' : ''} onchange="setRelationNetworkFilter('extra',this.checked)"> 추가 관계</label>
+          <select aria-label="추가 관계 유형" onchange="setRelationNetworkFilter('type',this.value)"><option value="">모든 추가 관계</option>${networkTypes.map(type => `<option value="${esc(type)}" ${relationNetworkState.type === type ? 'selected' : ''}>${esc(type)}</option>`).join('')}</select>
+          <div class="rn-zoom"><button class="btn btn-outline btn-sm" onclick="zoomRelationNetwork(1/1.2)" aria-label="축소">−</button><button class="btn btn-outline btn-sm" onclick="resetRelationNetworkView()">화면 맞춤</button><button class="btn btn-outline btn-sm" onclick="zoomRelationNetwork(1.2)" aria-label="확대">＋</button></div>
+        </div>
+        <svg id="rn-svg" class="rn-svg" aria-label="인물 관계망"></svg>
+        <div id="rn-detail" class="rn-detail" aria-live="polite"></div>
+      </div>
       ${chars.length < 2
         ? `<div class="card empty-state"><div class="emoji">🔗</div><p>등장인물을 2명 이상 추가하면<br>관계를 설정할 수 있습니다.</p></div>`
         : `
         <div class="card" style="margin-bottom:16px">
           <div class="sec-title">${editing ? '관계 수정' : '관계 추가'}</div>
-          <div style="font-size:11px;color:var(--muted);margin:-8px 0 12px">여기서 만드는 서사 관계는 가계도의 부모·배우자 연결과 별도로 관리됩니다.</div>
+          <div style="font-size:11px;color:var(--muted);margin:-8px 0 12px">추가 관계는 가계도 배치와 별도로 관리됩니다. 관계망에는 가족 연결과 함께 표시됩니다.</div>
           <div class="form-grid" style="align-items:end">
             <div><label class="label" for="rel-from-search">인물 A</label><input id="rel-from-search" type="search" placeholder="이름 검색" oninput="filterRelationSelect('rel-from-search','rel-from')"><select id="rel-from" aria-label="인물 A"><option value="">인물 선택</option>${charOpts(editing?.fromId)}</select></div>
             <div><label class="label" for="rel-to-search">인물 B</label><input id="rel-to-search" type="search" placeholder="이름 검색" oninput="filterRelationSelect('rel-to-search','rel-to')"><select id="rel-to" aria-label="인물 B"><option value="">인물 선택</option>${charOpts(editing?.toId)}</select></div>
@@ -751,6 +953,7 @@ function renderRelations(preserveEdit = false) {
           <div class="rel-map">${relList}</div>
         </div>`}
     </div>`;
+  setupRelationNetwork();
 }
 
 function addRelation() {
