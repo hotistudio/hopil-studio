@@ -39,6 +39,7 @@ const context = vm.createContext({
   confirmDialog: (_, callback) => callback(), cleanupCharacterReferences() {},
   crRerender() {},
 });
+vm.runInContext(part('let charEditSession =', 'function showCharModal('), context);
 vm.runInContext(part('let relationEditIndex', 'function renderRelations('), context);
 vm.runInContext(part('function setCrLineageStatus(idx, value)', 'function setCrRelationType(type)'), context);
 vm.runInContext(part('function setCrRelationType(type)', 'function setCrFamily('), context);

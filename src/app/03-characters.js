@@ -99,8 +99,32 @@ function renderCharacters() {
 }
 
 
-function showCharModal(idx, activeTab) {
-  const p = getProject();
+let charEditSession = null;
+function getCharEditProject() { return charEditSession?.draft || getProject(); }
+function cancelCharEdit() { charEditSession = null; closeModal(); }
+function commitCharEdit() {
+  if (!charEditSession) return;
+  const { original, draft } = charEditSession;
+  for (const key of ['characters', 'families', 'relations', 'psyArcs']) {
+    if (draft[key] !== undefined) original[key] = draft[key];
+  }
+  charEditSession = null;
+}
+function captureCharBasicDraft(idx) {
+  if (!document.getElementById('cm-name')) return;
+  if (!charEditSession) return;
+  const c = charEditSession.basic || (charEditSession.basic = {});
+  const fields = {name:'name',role:'role',age:'age',gender:'gender',alive:'alive',appearance:'app',personality:'per',background:'bg',speech:'sp',likes:'likes',dislikes:'dislikes',honorific:'title',goal:'goal'};
+  Object.entries(fields).forEach(([key, suffix]) => {
+    const input = document.getElementById('cm-' + suffix);
+    if (input) c[key] = input.value;
+  });
+  c.color = document.querySelector('#cm-color-group [data-selected]')?.dataset?.val || '';
+}
+
+function showCharModal(idx, activeTab, keepDraft = false) {
+  if (!keepDraft) charEditSession = { original: getProject(), draft: JSON.parse(JSON.stringify(getProject())) };
+  const p = getCharEditProject();
   const c = idx !== undefined ? p.characters[idx] : {};
   const tab = activeTab || 'basic';
   const isEdit = idx !== undefined;
@@ -124,7 +148,7 @@ function showCharModal(idx, activeTab) {
     </div>
 
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal()">취소</button>
+      <button class="btn btn-outline" onclick="cancelCharEdit()">취소</button>
       <button class="btn btn-gold" onclick="${tab==='relation'?`saveCharRelation(${idx})`:`saveChar(${idx===undefined?'undefined':idx})`}">저장</button>
     </div>
   `, false);
@@ -134,12 +158,13 @@ function showCharModal(idx, activeTab) {
 }
 
 function switchCharModalTab(idx, tab) {
-  showCharModal(idx, tab);
+  captureCharBasicDraft(idx);
+  showCharModal(idx, tab, true);
 }
 
 function renderCharBasicTab(idx) {
-  const p = getProject();
-  const c = idx !== undefined ? p.characters[idx] : {};
+  const p = getCharEditProject();
+  const c = { ...(idx !== undefined ? p.characters[idx] : {}), ...(charEditSession?.basic || {}) };
   return `
     <div class="form-grid">
       <div><label class="label">이름 *</label><input id="cm-name" value="${esc(c.name||'')}" placeholder="캐릭터 이름"></div>
@@ -184,15 +209,12 @@ function renderCharBasicTab(idx) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// RELATION TAB — 즉시 저장 방식
+// RELATION TAB — 편집 사본에 반영 후 저장
 // ═══════════════════════════════════════════════════════════════
-// 편집 버퍼(_crState)를 쓰지 않는다. 모든 변경은 p.characters[idx] 에 즉시
-// 반영되고 autoSave() 된다. 렌더링도 항상 저장된 데이터를 본다.
-// 이 구조는 "편집 중 새로고침 / 모달 재열기" 같은 모든 경로에서 일관된 결과를
-// 보장한다. 순환 참조 검증은 추가 시점에 수행한다.
+// 관계 변경은 편집 사본에만 반영한다. 저장 시 작품에 적용하며 취소 시 버린다.
 
 function renderCharRelationTab(idx) {
-  const p = getProject();
+  const p = getCharEditProject();
   const c = p.characters[idx];
   if (!c) return '<div style="color:var(--muted)">인물을 찾을 수 없습니다.</div>';
 
@@ -358,10 +380,10 @@ function crRerender(idx) {
 }
 
 function setCrLineageStatus(idx, value) {
-  const c = getProject()?.characters?.[idx];
+  const c = getCharEditProject()?.characters?.[idx];
   if (!c || !['', '서자', '서녀'].includes(value)) return;
   c.lineageStatus = value;
-  autoSave();
+  if (!charEditSession) autoSave();
 }
 
 function setCrRelationType(type) {
@@ -370,7 +392,7 @@ function setCrRelationType(type) {
 }
 
 function addCrRelation(idx) {
-  const p = getProject();
+  const p = getCharEditProject();
   const c = p.characters[idx];
   if (!c) return;
   const toId = document.getElementById('cr-rel-to')?.value || '';
@@ -378,22 +400,22 @@ function addCrRelation(idx) {
   const type = document.getElementById('cr-rel-type')?.value || '';
   const error = saveRelationData(p, reverse ? toId : c.id, reverse ? c.id : toId, type);
   if (error) { toast(error); return; }
-  autoSave();
+  if (!charEditSession) autoSave();
   crRerender(idx);
 }
 
 function removeCrRelation(idx, relationIndex) {
   confirmDialog('이 관계를 삭제할까요?', () => {
-    const p = getProject();
+    const p = getCharEditProject();
     if (!Array.isArray(p.relations) || !p.relations[relationIndex]) return;
     p.relations.splice(relationIndex, 1);
-    autoSave();
+    if (!charEditSession) autoSave();
     crRerender(idx);
   });
 }
 
 function setCrFamily(idx, familyId) {
-  const p = getProject();
+  const p = getCharEditProject();
   const c = p.characters[idx];
   if (!c) return;
   const oldFamilyId = c.familyId || '';
@@ -418,11 +440,11 @@ function setCrFamily(idx, familyId) {
   if (newFamilyId) {
     addCharToFamily(p, c.id, newFamilyId);
   }
-  autoSave();
+  if (!charEditSession) autoSave();
 }
 
 function addCrParent(idx) {
-  const p = getProject();
+  const p = getCharEditProject();
   const c = p.characters[idx];
   if (!c) return;
   const sel = document.getElementById('cr-parent-add');
@@ -449,21 +471,21 @@ function addCrParent(idx) {
   if (c.parents.length > 2) {
     toast('부모는 최대 2명까지 권장합니다.');
   }
-  autoSave();
+  if (!charEditSession) autoSave();
   crRerender(idx);
 }
 
 function removeCrParent(idx, parentId) {
-  const p = getProject();
+  const p = getCharEditProject();
   const c = p.characters[idx];
   if (!c || !Array.isArray(c.parents)) return;
   c.parents = c.parents.filter(x => x !== parentId);
-  autoSave();
+  if (!charEditSession) autoSave();
   crRerender(idx);
 }
 
 function addCrSpouse(idx) {
-  const p = getProject();
+  const p = getCharEditProject();
   const c = p.characters[idx];
   if (!c) return;
   const sel = document.getElementById('cr-spouse-add');
@@ -493,44 +515,41 @@ function addCrSpouse(idx) {
 
   const nextSpouses = [...c.spouses, { id: uid(), charId: id, status: 'current', note: '' }];
   syncSpouseLinks(p, c.id, nextSpouses);
-  autoSave();
+  if (!charEditSession) autoSave();
   crRerender(idx);
 }
 
 function removeCrSpouse(idx, si) {
-  const p = getProject();
+  const p = getCharEditProject();
   const c = p.characters[idx];
   if (!c || !Array.isArray(c.spouses)) return;
   const nextSpouses = c.spouses.filter((_, i) => i !== si);
   syncSpouseLinks(p, c.id, nextSpouses);
-  autoSave();
+  if (!charEditSession) autoSave();
   crRerender(idx);
 }
 
 function setCrSpouseStatus(idx, si, status) {
-  const p = getProject();
+  const p = getCharEditProject();
   const c = p.characters[idx];
   if (!c || !Array.isArray(c.spouses) || !c.spouses[si]) return;
   c.spouses[si].status = status;
-  // 상대방 쪽 status 는 자동 동기화하지 않는다 (각자 독립)
-  autoSave();
+  const other = p.characters.find(x => x.id === c.spouses[si].charId);
+  const reciprocal = other?.spouses?.find(sp => sp.charId === c.id);
+  if (reciprocal) reciprocal.status = status;
+  if (!charEditSession) autoSave();
 }
 
 function saveCharRelation(idx) {
-  // 관계 탭은 즉시 저장이므로 별도 저장 없이 닫기만 한다.
-  // 분기 이동(등장인물 탭으로 가는 것)을 피하기 위해 render 호출도 생략.
-  closeModal();
-  if (state.activeTab === 'familytree') renderFamilyTree();
-  else if (state.activeTab === 'relations') renderRelations();
-  else if (state.activeTab === 'characters') renderCharacters();
-  toast('저장되었습니다.');
+  showCharModal(idx, 'basic', true);
+  saveChar(idx);
 }
 
 function saveChar(idx) {
   const name = document.getElementById('cm-name').value.trim();
   if (!name) { toast('이름을 입력해주세요.'); return; }
-  const existing = idx !== undefined ? getProject().characters[idx] : null;
-  if (existing) migrateRelationIds(getProject());
+  const existing = idx !== undefined ? getCharEditProject().characters[idx] : null;
+  if (existing) migrateRelationIds(getCharEditProject());
   const c = {
     id: existing ? existing.id : uid(),
     name, role: document.getElementById('cm-role').value,
@@ -553,7 +572,7 @@ function saveChar(idx) {
     familyId: existing && typeof existing.familyId === 'string' ? existing.familyId : '',
     lineageStatus: existing && ['서자', '서녀'].includes(existing.lineageStatus) ? existing.lineageStatus : '',
   };
-  const p = getProject();
+  const p = getCharEditProject();
   // 기존 이름 기반 심리 아크도 인물 이름이 바뀌기 전에 ID로 연결한다.
   if (existing && Array.isArray(p.psyArcs)) {
     const uniqueOldName = (p.characters || []).filter(character => character.name === existing.name).length === 1;
@@ -590,7 +609,8 @@ function saveChar(idx) {
       });
     });
   }
-  autoSave(); closeModal();
+  commitCharEdit();
+  if (!charEditSession) autoSave(); closeModal();
   // 참고 패널이 열려있으면 패널만 갱신, 아니면 현재 탭을 재렌더
   const splitPanel = document.getElementById('split-panel');
   const inSplitPanel = splitPanel && !splitPanel.classList.contains('hidden');
@@ -729,7 +749,7 @@ function saveRelationData(p, fromId, toId, type, editIndex = -1) {
 
 const relationNetworkState = {
   showFamily: true, showExtra: true, type: '', selectedId: null,
-  zoom: 1, panX: 0, panY: 0, layoutKey: '', layout: null,
+  focusOnly: false, zoom: 1, panX: 0, panY: 0, layoutKey: '', layout: null,
 };
 
 function relationNetworkEdges(p) {
@@ -800,6 +820,8 @@ function relationNetworkLayout(chars, edges, width, height) {
 function setRelationNetworkFilter(name, value) {
   if (name === 'type') relationNetworkState.type = value;
   else if (name === 'family') relationNetworkState.showFamily = value;
+  else if (name === 'focus') relationNetworkState.focusOnly = value;
+  else if (name === 'person') relationNetworkState.selectedId = value || null;
   else if (name === 'extra') relationNetworkState.showExtra = value;
   drawRelationNetwork();
 }
@@ -833,9 +855,14 @@ function drawRelationNetwork() {
   const detail = document.getElementById('rn-detail');
   if (!svg || !detail) return;
   const p = getProject();
-  const chars = p.characters || [];
+  let chars = p.characters || [];
   const allEdges = relationNetworkEdges(p);
-  const edges = allEdges.filter(e => e.group === 'family' ? relationNetworkState.showFamily : relationNetworkState.showExtra && (!relationNetworkState.type || e.type === relationNetworkState.type));
+  let edges = allEdges.filter(e => e.group === 'family' ? relationNetworkState.showFamily : relationNetworkState.showExtra && (!relationNetworkState.type || e.type === relationNetworkState.type));
+  if (relationNetworkState.focusOnly && relationNetworkState.selectedId) {
+    edges = edges.filter(e => e.from === relationNetworkState.selectedId || e.to === relationNetworkState.selectedId);
+    const ids = new Set([relationNetworkState.selectedId, ...edges.flatMap(e => [e.from, e.to])]);
+    chars = chars.filter(c => ids.has(String(c.id)));
+  }
   const width = Math.max(280, svg.clientWidth || 800), height = Math.max(360, svg.clientHeight || 480);
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   if (!chars.length) {
@@ -861,9 +888,11 @@ function drawRelationNetwork() {
     const offset = index ? (Math.ceil(index / 2) * 28 * (index % 2 ? 1 : -1)) : 0;
     const midX = (a.x + b.x) / 2 - dy / length * offset;
     const midY = (a.y + b.y) / 2 + dx / length * offset;
+    const endScale = Math.min(.45, Math.min(58 / Math.max(.01, Math.abs(dx)), 29 / Math.max(.01, Math.abs(dy))));
+    const endX = b.x - dx * endScale, endY = b.y - dy * endScale;
     const active = !selected || selected === e.from || selected === e.to;
     const color = e.group === 'family' ? 'var(--gold)' : 'var(--teal)';
-    return `<g class="rn-edge${active ? '' : ' dim'}"><path d="M ${a.x} ${a.y} Q ${midX * 2 - (a.x + b.x) / 2} ${midY * 2 - (a.y + b.y) / 2} ${b.x} ${b.y}" fill="none" stroke="${color}" stroke-width="${active ? 2.4 : 1.4}" ${e.group === 'extra' ? 'stroke-dasharray="6 4"' : ''}/><rect x="${midX - Math.max(22, e.type.length * 6 + 7)}" y="${midY - 11}" width="${Math.max(44, e.type.length * 12 + 14)}" height="22" rx="10" class="rn-edge-label-bg"/><text x="${midX}" y="${midY + 4}" text-anchor="middle" class="rn-edge-label">${esc(e.type)}${e.directed ? ' →' : ''}</text></g>`;
+    return `<g class="rn-edge${active ? '' : ' dim'}"><path d="M ${a.x} ${a.y} Q ${midX * 2 - (a.x + b.x) / 2} ${midY * 2 - (a.y + b.y) / 2} ${endX} ${endY}" ${e.directed ? 'marker-end="url(#rn-arrow)"' : ''} fill="none" stroke="${color}" stroke-width="${active ? 2.4 : 1.4}" ${e.group === 'extra' ? 'stroke-dasharray="6 4"' : ''}/><rect x="${midX - Math.max(22, e.type.length * 6 + 7)}" y="${midY - 11}" width="${Math.max(44, e.type.length * 12 + 14)}" height="22" rx="10" class="rn-edge-label-bg"/><text x="${midX}" y="${midY + 4}" text-anchor="middle" class="rn-edge-label">${esc(e.type)}</text></g>`;
   }).join('');
   const nodes = chars.map(c => {
     const pos = positions.get(String(c.id));
@@ -871,7 +900,7 @@ function drawRelationNetwork() {
     const description = [c.lineageStatus, c.role].filter(Boolean).join(' · ');
     return `<g class="rn-node${selected === String(c.id) ? ' selected' : ''}${active ? '' : ' dim'}" data-id="${esc(c.id)}" transform="translate(${pos.x},${pos.y})" tabindex="0" role="button" aria-label="${esc(c.name)}${c.lineageStatus ? `, ${esc(c.lineageStatus)}` : ''} 관계 보기"><rect x="-54" y="-25" width="108" height="50" rx="12"/><text text-anchor="middle" y="-1" class="rn-node-name">${esc(c.name.length > 9 ? c.name.slice(0, 8) + '…' : c.name)}</text><text text-anchor="middle" y="16" class="rn-node-role">${esc(description.length > 12 ? description.slice(0, 11) + '…' : description)}</text></g>`;
   }).join('');
-  svg.innerHTML = `<g transform="translate(${relationNetworkState.panX},${relationNetworkState.panY}) scale(${relationNetworkState.zoom})">${paths}${nodes}</g>`;
+  svg.innerHTML = `<defs><marker id="rn-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink)"/></marker></defs><g transform="translate(${relationNetworkState.panX},${relationNetworkState.panY}) scale(${relationNetworkState.zoom})">${paths}${nodes}</g>`;
   const person = chars.find(c => String(c.id) === selected);
   if (!person) {
     detail.innerHTML = `<span>인물을 선택하면 연결된 관계가 강조됩니다.</span><span>${chars.length}명 · 표시된 연결 ${edges.length}개</span>`;
@@ -948,6 +977,8 @@ function renderRelations(preserveEdit = false) {
       <div class="font-display" style="font-size:22px;margin-bottom:16px">인물 관계망</div>
       <div class="card rn-card">
         <div class="rn-toolbar">
+          <select aria-label="중심 인물" onchange="setRelationNetworkFilter('person',this.value)"><option value="">인물 선택</option>${relationCharacterOptions(chars, relationNetworkState.selectedId)}</select>
+          <label><input type="checkbox" ${relationNetworkState.focusOnly ? 'checked' : ''} onchange="setRelationNetworkFilter('focus',this.checked)"> 선택 인물 주변만</label>
           <label><input type="checkbox" ${relationNetworkState.showFamily ? 'checked' : ''} onchange="setRelationNetworkFilter('family',this.checked)"> 가족 연결</label>
           <label><input type="checkbox" ${relationNetworkState.showExtra ? 'checked' : ''} onchange="setRelationNetworkFilter('extra',this.checked)"> 추가 관계</label>
           <select aria-label="추가 관계 유형" onchange="setRelationNetworkFilter('type',this.value)"><option value="">모든 추가 관계</option>${networkTypes.map(type => `<option value="${esc(type)}" ${relationNetworkState.type === type ? 'selected' : ''}>${esc(type)}</option>`).join('')}</select>

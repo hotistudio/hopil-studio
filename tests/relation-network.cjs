@@ -39,6 +39,10 @@ assert.equal(single.get('a').y, 240);
 
 vm.runInContext('drawRelationNetwork()', context);
 assert(svg.innerHTML.includes('스승→제자'));
+assert(svg.innerHTML.includes('marker-end="url(#rn-arrow)"'));
+vm.runInContext("setRelationNetworkFilter('person', 'c'); setRelationNetworkFilter('focus', true)", context);
+assert(!svg.innerHTML.includes('data-id="b"'));
+vm.runInContext("setRelationNetworkFilter('focus', false); setRelationNetworkFilter('person', '')", context);
 assert(svg.innerHTML.includes('서녀'), 'the child birth label appears on the network node');
 assert(svg.innerHTML.includes('stroke-dasharray'), 'extra relations use dashed lines');
 vm.runInContext("selectRelationNetworkNode('a')", context);

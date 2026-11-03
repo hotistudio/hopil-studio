@@ -5,7 +5,7 @@ async function exportAllProjects() {
   const data = { projects: state.projects, ...statsBackup(), version: '2.1', savedAt: new Date().toISOString() };
   const filename = '호필스튜디오_전체백업_' + getTodayStr() + '.json';
   _downloadJson(data, filename);
-  toast('전체 저장 완료! ' + state.projects.length + '개 작품 💾');
+  toast('전체 백업 다운로드를 요청했습니다. 다운로드 목록에서 파일을 확인해주세요.');
 }
 
 async function exportCurrentProject() {
@@ -72,7 +72,7 @@ async function exportSingleProject(pid) {
 function downloadProjectBackup(data, filename) {
   try {
     _downloadJson(data, filename);
-    toast('JSON 파일을 다운로드했습니다. 파일 크기와 내용을 확인해주세요.');
+    toast('JSON 파일 다운로드를 요청했습니다. 다운로드 목록에서 완료 여부를 확인해주세요.');
     return true;
   } catch (e) {
     console.error('JSON 다운로드 실패:', e);

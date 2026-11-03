@@ -36,6 +36,7 @@ const context = vm.createContext({
   uid: () => 'new-id', autoSave: () => saves++, closeModal() {}, toast() {},
   renderPsyArc() {}, renderCharacters() {}, state: { activeTab: 'characters' },
 });
+vm.runInContext(section(characters, 'let charEditSession =', 'function showCharModal('), context);
 vm.runInContext(section(features, 'function getPsyArcCharacter(', '// 배경색에 따라'), context);
 vm.runInContext(section(features, 'function savePsyArc(', 'function deletePsyArc('), context);
 vm.runInContext(section(features, 'function savePsyStep(', 'function deletePsyStep('), context);

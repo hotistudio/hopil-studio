@@ -1,0 +1,25 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync('scripts/app.js', 'utf8');
+function part(a,b) { return source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a))); }
+const project = {characters:[{id:'a',name:'원래 이름',spouses:[{charId:'b',status:'current'}]},{id:'b',name:'상대',spouses:[{charId:'a',status:'current'}]}],relations:[]};
+let saves=0;
+const context=vm.createContext({getProject:()=>project,closeModal(){},autoSave(){saves++},document:{getElementById:id=>id==='cm-name'?{value:'작성 중'}:null,querySelector:()=>null}});
+vm.runInContext(part('let charEditSession =','function showCharModal('),context);
+vm.runInContext(part('function setCrSpouseStatus(','function saveCharRelation('),context);
+const begin=()=>vm.runInContext('charEditSession={original:getProject(),draft:JSON.parse(JSON.stringify(getProject()))}',context);
+begin();
+vm.runInContext('captureCharBasicDraft(0); setCrSpouseStatus(0,0,"past")',context);
+assert.equal(project.characters[0].name,'원래 이름');
+assert.equal(project.characters[0].spouses[0].status,'current');
+assert.equal(vm.runInContext('charEditSession.basic.name',context),'작성 중');
+assert.equal(vm.runInContext('getCharEditProject().characters[1].spouses[0].status',context),'past');
+assert.equal(saves,0);
+vm.runInContext('cancelCharEdit()',context);
+assert.equal(project.characters[0].spouses[0].status,'current');
+begin();
+vm.runInContext('setCrSpouseStatus(0,0,"deceased"); commitCharEdit()',context);
+assert.equal(project.characters[0].spouses[0].status,'deceased');
+assert.equal(project.characters[1].spouses[0].status,'deceased');
+console.log('Character draft isolation, input capture, cancellation, commit, and reciprocal status passed.');
