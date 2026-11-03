@@ -279,6 +279,9 @@ function renderCharRelationTab(idx) {
     !c.parents.includes(x.id)     // 부모 배열에 있지만 ancestorIds에는 이미 포함됨. 이중 방어
   );
 
+  const narrativeRelations = (p.relations || []).map((r, i) => ({ r, i }))
+    .filter(({ r }) => String(r.fromId) === String(c.id) || String(r.toId) === String(c.id));
+
   return `
     <div style="display:flex;flex-direction:column;gap:18px">
 
@@ -317,6 +320,24 @@ function renderCharRelationTab(idx) {
         </div>`:''}
       </div>
 
+      <div>
+        <label class="label">추가 관계</label>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">이 관계는 인물 관계도에도 표시되며 가계도 배치는 바꾸지 않습니다. 스승·주군·짝사랑은 앞 사람에서 뒤 사람 방향입니다.</div>
+        ${narrativeRelations.length ? narrativeRelations.map(({ r, i }) => `
+          <div style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">
+            <span style="min-width:0;overflow-wrap:anywhere">${esc(relationName(p, r, 'from'))} → ${esc(r.type)} → ${esc(relationName(p, r, 'to'))}</span>
+            <button class="btn-icon" onclick="removeCrRelation(${idx}, ${i})" aria-label="관계 삭제" style="margin-left:auto;color:var(--rust);flex:none">✕</button>
+          </div>`).join('') : '<div style="color:var(--muted);font-size:12px;padding:4px 0">등록된 추가 관계가 없습니다.</div>'}
+        ${others.length ? `
+          <div style="display:grid;gap:6px;margin-top:8px">
+            <select id="cr-rel-to" aria-label="관계 상대"><option value="">— 관계 상대 선택 —</option>${relationCharacterOptions(others)}</select>
+            <select id="cr-rel-direction" aria-label="관계 방향"><option value="forward">이 인물 → 관계 상대</option><option value="reverse">관계 상대 → 이 인물</option></select>
+            <input id="cr-rel-type" aria-label="관계 유형" placeholder="관계 유형 직접 입력">
+            <div class="relation-presets">${RELATION_TYPES.map(type => `<button type="button" class="btn btn-outline btn-sm" onclick="setCrRelationType(${jsArg(type)})">${esc(type)}</button>`).join('')}</div>
+            <button class="btn btn-outline btn-sm" onclick="addCrRelation(${idx})">＋ 관계 추가</button>
+          </div>` : ''}
+      </div>
+
     </div>
   `;
 }
@@ -325,6 +346,34 @@ function renderCharRelationTab(idx) {
 function crRerender(idx) {
   const el = document.getElementById('cm-tab-content');
   if (el) el.innerHTML = renderCharRelationTab(idx);
+}
+
+function setCrRelationType(type) {
+  const input = document.getElementById('cr-rel-type');
+  if (input) input.value = type;
+}
+
+function addCrRelation(idx) {
+  const p = getProject();
+  const c = p.characters[idx];
+  if (!c) return;
+  const toId = document.getElementById('cr-rel-to')?.value || '';
+  const reverse = document.getElementById('cr-rel-direction')?.value === 'reverse';
+  const type = document.getElementById('cr-rel-type')?.value || '';
+  const error = saveRelationData(p, reverse ? toId : c.id, reverse ? c.id : toId, type);
+  if (error) { toast(error); return; }
+  autoSave();
+  crRerender(idx);
+}
+
+function removeCrRelation(idx, relationIndex) {
+  confirmDialog('이 관계를 삭제할까요?', () => {
+    const p = getProject();
+    if (!Array.isArray(p.relations) || !p.relations[relationIndex]) return;
+    p.relations.splice(relationIndex, 1);
+    autoSave();
+    crRerender(idx);
+  });
 }
 
 function setCrFamily(idx, familyId) {
@@ -566,7 +615,7 @@ function deleteChar(idx) {
 // RELATIONS
 // ═══════════════════════════════════════════════════════════════
 let relationEditIndex = -1;
-const RELATION_TYPES = ['친구', '동료', '라이벌', '연인', '스승', '가족'];
+const RELATION_TYPES = ['사촌', '스승→제자', '내연 상대', '약혼자', '이복형제', '주군→가신', '원수', '짝사랑→상대'];
 
 function migrateRelationIds(p) {
   if (!Array.isArray(p?.relations)) return false;
@@ -693,7 +742,7 @@ function renderRelations(preserveEdit = false) {
           <div class="form-grid" style="align-items:end">
             <div><label class="label" for="rel-from-search">인물 A</label><input id="rel-from-search" type="search" placeholder="이름 검색" oninput="filterRelationSelect('rel-from-search','rel-from')"><select id="rel-from" aria-label="인물 A"><option value="">인물 선택</option>${charOpts(editing?.fromId)}</select></div>
             <div><label class="label" for="rel-to-search">인물 B</label><input id="rel-to-search" type="search" placeholder="이름 검색" oninput="filterRelationSelect('rel-to-search','rel-to')"><select id="rel-to" aria-label="인물 B"><option value="">인물 선택</option>${charOpts(editing?.toId)}</select></div>
-            <div><label class="label" for="rel-type">관계 유형</label><input id="rel-type" value="${esc(editing?.type || '')}" placeholder="예: 친구, 라이벌, 스승"><div class="relation-presets">${RELATION_TYPES.map(type => `<button type="button" class="btn btn-outline btn-sm" onclick="setRelationType(${jsArg(type)})">${esc(type)}</button>`).join('')}</div></div>
+            <div><label class="label" for="rel-type">관계 유형</label><input id="rel-type" value="${esc(editing?.type || '')}" placeholder="관계 유형 직접 입력"><div class="relation-presets">${RELATION_TYPES.map(type => `<button type="button" class="btn btn-outline btn-sm" onclick="setRelationType(${jsArg(type)})">${esc(type)}</button>`).join('')}</div><div style="font-size:11px;color:var(--muted);margin-top:6px">스승→제자, 주군→가신, 짝사랑→상대는 인물 A에서 B 방향입니다.</div></div>
             <div class="relation-actions"><button class="btn btn-outline" onclick="swapRelationCharacters()" title="인물 A와 B 바꾸기">⇄ 바꾸기</button><button class="btn btn-gold" onclick="addRelation()">${editing ? '변경 저장' : '추가'}</button>${editing ? '<button class="btn btn-outline" onclick="cancelRelationEdit()">취소</button>' : ''}</div>
           </div>
         </div>

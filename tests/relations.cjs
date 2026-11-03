@@ -21,7 +21,12 @@ const project = {
   ],
 };
 let saves = 0;
-const fields = new Map([['cm-name', { value: '가 변경' }]]);
+const fields = new Map([
+  ['cm-name', { value: '가 변경' }],
+  ['cr-rel-to', { value: 'b' }],
+  ['cr-rel-direction', { value: 'forward' }],
+  ['cr-rel-type', { value: '' }],
+]);
 const context = vm.createContext({
   CURRENT_SCHEMA_VERSION: 4,
   getProject: () => project,
@@ -32,8 +37,10 @@ const context = vm.createContext({
   state: { activeTab: 'characters' },
   autoSave: () => saves++, closeModal() {}, renderCharacters() {}, toast() {},
   confirmDialog: (_, callback) => callback(), cleanupCharacterReferences() {},
+  crRerender() {},
 });
 vm.runInContext(part('let relationEditIndex', 'function renderRelations('), context);
+vm.runInContext(part('function setCrRelationType(type)', 'function setCrFamily('), context);
 vm.runInContext(part('function migrateProject(p)', 'function cleanupCharacterReferences'), context);
 vm.runInContext(part('function saveChar(idx)', 'function deleteChar(idx)'), context);
 vm.runInContext(part('function deleteChar(idx)', 'let relationEditIndex'), context);
@@ -58,11 +65,25 @@ assert.equal(project.relations[0].type, '동료');
 assert.equal(vm.runInContext("saveRelationData(getProject(), 'c', 'b', '라이벌')", context), '');
 assert.equal(project.relations[2].fromId, 'c');
 
+vm.runInContext("setCrRelationType('스승→제자')", context);
+assert.equal(fields.get('cr-rel-type').value, '스승→제자');
+vm.runInContext('addCrRelation(0)', context);
+assert.equal(project.relations[3].fromId, 'a');
+assert.equal(project.relations[3].toId, 'b');
+assert.equal(project.relations[3].type, '스승→제자');
+fields.get('cr-rel-direction').value = 'reverse';
+vm.runInContext("setCrRelationType('짝사랑→상대')", context);
+vm.runInContext('addCrRelation(0)', context);
+assert.equal(project.relations[4].fromId, 'b');
+assert.equal(project.relations[4].toId, 'a');
+vm.runInContext('removeCrRelation(0, 3)', context);
+assert.equal(project.relations.length, 4);
+
 vm.runInContext('saveChar(0)', context);
 assert.equal(project.relations[0].from, '가 변경');
 assert.equal(vm.runInContext("relationName(getProject(), getProject().relations[0], 'from')", context), '가 변경');
 
 vm.runInContext('deleteChar(1)', context);
 assert.equal(project.relations.length, 0, 'deleting a character removes its linked relations');
-assert.equal(saves, 2);
-console.log('Relation migration, duplicates, rename, and delete passed.');
+assert.equal(saves, 5);
+console.log('Relation migration, modal add/remove, direction, duplicates, rename, and delete passed.');

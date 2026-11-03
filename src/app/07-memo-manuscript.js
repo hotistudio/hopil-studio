@@ -1081,7 +1081,8 @@ function renderSplitContent() {
       <div style="display:grid;gap:7px;margin-bottom:16px;padding:10px;background:var(--cream);border-radius:8px">
         <strong style="font-size:12px">관계 추가</strong>
         <select id="split-rel-from" aria-label="인물 A"><option value="">인물 A 선택</option>${charOpts}</select>
-        <input id="split-rel-type" aria-label="관계 유형" placeholder="관계 유형 (예: 동료, 라이벌)">
+        <select aria-label="관계 유형 빠른 선택" onchange="setSplitRelationType(this.value)"><option value="">— 관계 유형 빠른 선택 —</option>${RELATION_TYPES.map(type => `<option value="${esc(type)}">${esc(type)}</option>`).join('')}</select>
+        <input id="split-rel-type" aria-label="관계 유형" placeholder="관계 유형 직접 입력">
         <select id="split-rel-to" aria-label="인물 B"><option value="">인물 B 선택</option>${charOpts}</select>
         <button class="btn btn-gold btn-sm" onclick="addSplitRelation()">＋ 관계 추가</button>
       </div>
@@ -1189,6 +1190,11 @@ function renderSplitContent() {
   } else if (splitTab === 'glossary') {
     el.innerHTML = renderSplitGlossary();
   }
+}
+
+function setSplitRelationType(type) {
+  const input = splitElement('split-rel-type');
+  if (input && type) input.value = type;
 }
 
 function addSplitRelation() {
