@@ -11,7 +11,7 @@ const project = {
   characters: [
     { id: 'a', name: '가', role: '주인공', parents: [], spouses: [{ charId: 'b', status: 'current' }] },
     { id: 'b', name: '나', parents: [], spouses: [{ charId: 'a', status: 'current' }] },
-    { id: 'c', name: '다', parents: ['a'], spouses: [] },
+    { id: 'c', name: '다', parents: ['a'], spouses: [], lineageStatus: '서녀' },
   ],
   relations: [
     { fromId: 'a', toId: 'c', type: '스승→제자' },
@@ -39,6 +39,7 @@ assert.equal(single.get('a').y, 240);
 
 vm.runInContext('drawRelationNetwork()', context);
 assert(svg.innerHTML.includes('스승→제자'));
+assert(svg.innerHTML.includes('서녀'), 'the child birth label appears on the network node');
 assert(svg.innerHTML.includes('stroke-dasharray'), 'extra relations use dashed lines');
 vm.runInContext("selectRelationNetworkNode('a')", context);
 assert(detail.innerHTML.includes('스승→제자'));

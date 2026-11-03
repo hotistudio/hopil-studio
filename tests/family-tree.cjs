@@ -9,9 +9,11 @@ assert(start >= 0 && end > start, 'Family tree functions were not found');
 
 const parent = { id: 'parent', name: '부모', spouses: [{ charId: 'spouse', status: 'current' }] };
 const spouse = { id: 'spouse', name: '배우자', spouses: [{ charId: 'parent', status: 'current' }] };
-const child = { id: 'child', name: '자녀', parents: ['parent'] };
+const child = { id: 'child', name: '자녀', parents: ['parent'], lineageStatus: '서녀' };
 const characters = [parent, spouse, child];
 const editButton = { disabled: true, textContent: '' };
+const renderedNodes = { innerHTML: '' };
+const renderedEdges = { innerHTML: '' };
 const nodes = characters.map(character => ({
   dataset: { charId: character.id },
   classList: { toggle() {} }
@@ -20,15 +22,26 @@ let opened = null;
 const context = vm.createContext({
   FT_NODE_W: 130,
   FT_NODE_H: 64,
+  FT_H_GAP: 24,
   ftState: { selectedCharId: null },
   getProject: () => ({ characters }),
+  ftAssignGenerations: () => new Map(),
+  ftFindComponents: () => [characters],
+  ftLayoutComponent: () => new Map([
+    ['parent', { x: 0, y: 0 }], ['spouse', { x: 200, y: 0 }], ['child', { x: 0, y: 144 }]
+  ]),
+  esc: value => String(value),
   showCharModal: (index, tab) => { opened = { index, tab }; },
   document: {
-    getElementById: id => id === 'ft-edit-selected' ? editButton : null,
+    getElementById: id => ({ 'ft-edit-selected': editButton, 'ft-nodes': renderedNodes, 'ft-svg': renderedEdges })[id] || null,
     querySelectorAll: () => nodes
   }
 });
 vm.runInContext(source.slice(start, end), context);
+vm.runInContext(source.slice(source.indexOf('function ftDrawTree()'), start), context);
+
+context.ftDrawTree();
+assert.match(renderedNodes.innerHTML, /ft-node-lineage">서녀<\/span>/);
 
 const svg = { innerHTML: '' };
 const positions = new Map([

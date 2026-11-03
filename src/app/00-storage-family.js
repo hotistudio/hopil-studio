@@ -896,6 +896,7 @@ function ftDrawTree() {
       ? `<div class="ft-node-family" style="background:${family.color||'#c4922a'}22;color:${family.color||'#c4922a'}">${esc(family.name)}</div>`
       : '';
     const metaBits = [];
+    if (c.lineageStatus) metaBits.push(`<span class="ft-node-lineage">${esc(c.lineageStatus)}</span>`);
     if (c.age) metaBits.push(esc(c.age));
     if (c.role) metaBits.push(esc(c.role));
     const meta = metaBits.length ? `<div class="ft-node-meta">${metaBits.join(' · ')}</div>` : '';

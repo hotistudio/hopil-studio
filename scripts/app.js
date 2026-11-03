@@ -896,6 +896,7 @@ function ftDrawTree() {
       ? `<div class="ft-node-family" style="background:${family.color||'#c4922a'}22;color:${family.color||'#c4922a'}">${esc(family.name)}</div>`
       : '';
     const metaBits = [];
+    if (c.lineageStatus) metaBits.push(`<span class="ft-node-lineage">${esc(c.lineageStatus)}</span>`);
     if (c.age) metaBits.push(esc(c.age));
     if (c.role) metaBits.push(esc(c.role));
     const meta = metaBits.length ? `<div class="ft-node-meta">${metaBits.join(' · ')}</div>` : '';
@@ -2116,6 +2117,7 @@ function renderCharacters() {
               <span class="tag">${esc(c.role||'')}</span>
               ${c.age?`<span class="tag">${esc(c.age)}세</span>`:''}
               ${c.gender?`<span class="tag">${esc(c.gender)}</span>`:''}
+              ${c.lineageStatus?`<span class="tag" style="background:var(--gold-light);color:var(--gold)">${esc(c.lineageStatus)}</span>`:''}
               ${c.alive&&c.alive!=='생존'?`<span class="tag" style="background:${c.alive==='사망'?'var(--rust-light)':'var(--cream)'};color:${c.alive==='사망'?'var(--rust)':'var(--muted)'};border-color:${c.alive==='사망'?'var(--rust)':'var(--border)'}">${esc(c.alive)}</span>`:''}
             </div>
             ${c.appearance?`<div style="font-size:12px;color:var(--muted);margin-bottom:3px">외모: ${esc(c.appearance)}</div>`:''}
@@ -2384,6 +2386,14 @@ function renderCharRelationTab(idx) {
       </div>
 
       <div>
+        <label class="label" for="cr-lineage-status">자녀 출생 표기</label>
+        <select id="cr-lineage-status" onchange="setCrLineageStatus(${idx}, this.value)" style="width:100%">
+          ${[['','표시 없음'],['서자','서자'],['서녀','서녀']].map(([value, label]) => `<option value="${value}" ${c.lineageStatus === value ? 'selected' : ''}>${label}</option>`).join('')}
+        </select>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">부모 관계와 별도로 직접 지정합니다. 자동으로 추정하지 않습니다.</div>
+      </div>
+
+      <div>
         <label class="label">배우자 / 혼인</label>
         <div>
           ${spouseRows || '<div style="color:var(--muted);font-size:12px;padding:4px 0">등록된 배우자가 없습니다.</div>'}
@@ -2424,6 +2434,13 @@ function renderCharRelationTab(idx) {
 function crRerender(idx) {
   const el = document.getElementById('cm-tab-content');
   if (el) el.innerHTML = renderCharRelationTab(idx);
+}
+
+function setCrLineageStatus(idx, value) {
+  const c = getProject()?.characters?.[idx];
+  if (!c || !['', '서자', '서녀'].includes(value)) return;
+  c.lineageStatus = value;
+  autoSave();
 }
 
 function setCrRelationType(type) {
@@ -2582,6 +2599,9 @@ function saveCharRelation(idx) {
   // 관계 탭은 즉시 저장이므로 별도 저장 없이 닫기만 한다.
   // 분기 이동(등장인물 탭으로 가는 것)을 피하기 위해 render 호출도 생략.
   closeModal();
+  if (state.activeTab === 'familytree') renderFamilyTree();
+  else if (state.activeTab === 'relations') renderRelations();
+  else if (state.activeTab === 'characters') renderCharacters();
   toast('저장되었습니다.');
 }
 
@@ -2610,6 +2630,7 @@ function saveChar(idx) {
     parents:  existing && Array.isArray(existing.parents)  ? existing.parents  : [],
     spouses:  existing && Array.isArray(existing.spouses)  ? existing.spouses  : [],
     familyId: existing && typeof existing.familyId === 'string' ? existing.familyId : '',
+    lineageStatus: existing && ['서자', '서녀'].includes(existing.lineageStatus) ? existing.lineageStatus : '',
   };
   const p = getProject();
   // 기존 이름 기반 심리 아크도 인물 이름이 바뀌기 전에 ID로 연결한다.
@@ -2926,7 +2947,8 @@ function drawRelationNetwork() {
   const nodes = chars.map(c => {
     const pos = positions.get(String(c.id));
     const active = !selected || selected === String(c.id) || edges.some(e => (e.from === selected && e.to === String(c.id)) || (e.to === selected && e.from === String(c.id)));
-    return `<g class="rn-node${selected === String(c.id) ? ' selected' : ''}${active ? '' : ' dim'}" data-id="${esc(c.id)}" transform="translate(${pos.x},${pos.y})" tabindex="0" role="button" aria-label="${esc(c.name)} 관계 보기"><rect x="-54" y="-25" width="108" height="50" rx="12"/><text text-anchor="middle" y="-1" class="rn-node-name">${esc(c.name.length > 9 ? c.name.slice(0, 8) + '…' : c.name)}</text><text text-anchor="middle" y="16" class="rn-node-role">${esc((c.role || '').length > 12 ? c.role.slice(0, 11) + '…' : c.role || '')}</text></g>`;
+    const description = [c.lineageStatus, c.role].filter(Boolean).join(' · ');
+    return `<g class="rn-node${selected === String(c.id) ? ' selected' : ''}${active ? '' : ' dim'}" data-id="${esc(c.id)}" transform="translate(${pos.x},${pos.y})" tabindex="0" role="button" aria-label="${esc(c.name)}${c.lineageStatus ? `, ${esc(c.lineageStatus)}` : ''} 관계 보기"><rect x="-54" y="-25" width="108" height="50" rx="12"/><text text-anchor="middle" y="-1" class="rn-node-name">${esc(c.name.length > 9 ? c.name.slice(0, 8) + '…' : c.name)}</text><text text-anchor="middle" y="16" class="rn-node-role">${esc(description.length > 12 ? description.slice(0, 11) + '…' : description)}</text></g>`;
   }).join('');
   svg.innerHTML = `<g transform="translate(${relationNetworkState.panX},${relationNetworkState.panY}) scale(${relationNetworkState.zoom})">${paths}${nodes}</g>`;
   const person = chars.find(c => String(c.id) === selected);
@@ -2934,7 +2956,7 @@ function drawRelationNetwork() {
     detail.innerHTML = `<span>인물을 선택하면 연결된 관계가 강조됩니다.</span><span>${chars.length}명 · 표시된 연결 ${edges.length}개</span>`;
   } else {
     const connected = edges.filter(e => e.from === selected || e.to === selected);
-    detail.innerHTML = `<strong>${esc(person.name)}</strong>${connected.length ? connected.map(e => {
+    detail.innerHTML = `<strong>${esc(person.name)}${person.lineageStatus ? ` · ${esc(person.lineageStatus)}` : ''}</strong>${connected.length ? connected.map(e => {
       const other = chars.find(c => String(c.id) === (e.from === selected ? e.to : e.from));
       return `<span class="rn-detail-chip">${e.from === selected ? '→' : '←'} ${esc(e.type)} · ${esc(other?.name || '알 수 없음')}</span>`;
     }).join('') : '<span>표시된 관계가 없습니다.</span>'}`;

@@ -40,6 +40,7 @@ const context = vm.createContext({
   crRerender() {},
 });
 vm.runInContext(part('let relationEditIndex', 'function renderRelations('), context);
+vm.runInContext(part('function setCrLineageStatus(idx, value)', 'function setCrRelationType(type)'), context);
 vm.runInContext(part('function setCrRelationType(type)', 'function setCrFamily('), context);
 vm.runInContext(part('function migrateProject(p)', 'function cleanupCharacterReferences'), context);
 vm.runInContext(part('function saveChar(idx)', 'function deleteChar(idx)'), context);
@@ -79,11 +80,17 @@ assert.equal(project.relations[4].toId, 'a');
 vm.runInContext('removeCrRelation(0, 3)', context);
 assert.equal(project.relations.length, 4);
 
+vm.runInContext("setCrLineageStatus(0, '서자')", context);
+assert.equal(project.characters[0].lineageStatus, '서자');
+vm.runInContext("setCrLineageStatus(0, '알 수 없음')", context);
+assert.equal(project.characters[0].lineageStatus, '서자', 'unknown labels are rejected');
+
 vm.runInContext('saveChar(0)', context);
 assert.equal(project.relations[0].from, '가 변경');
+assert.equal(project.characters[0].lineageStatus, '서자', 'basic information edits preserve the birth label');
 assert.equal(vm.runInContext("relationName(getProject(), getProject().relations[0], 'from')", context), '가 변경');
 
 vm.runInContext('deleteChar(1)', context);
 assert.equal(project.relations.length, 0, 'deleting a character removes its linked relations');
-assert.equal(saves, 5);
-console.log('Relation migration, modal add/remove, direction, duplicates, rename, and delete passed.');
+assert.equal(saves, 6);
+console.log('Relation migration, modal add/remove, birth label, direction, duplicates, rename, and delete passed.');

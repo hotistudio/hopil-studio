@@ -494,6 +494,8 @@ html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacit
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ft-node-meta{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.2;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ft-node-lineage{display:inline-block;background:var(--gold-light);color:var(--gold);
+  border-radius:5px;padding:1px 4px;font-weight:700}
 .ft-node-family{font-size:10px;font-weight:600;margin-top:3px;padding:1px 6px;border-radius:8px;display:inline-block;
   max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 [data-theme="dark"] .ft-node{background:var(--white)}
