@@ -1067,6 +1067,7 @@ function renderSplitContent() {
 
   } else if (splitTab === 'relations') {
     const chars = p.characters || [];
+    if (migrateRelationIds(p)) autoSave();
     const rels = p.relations || [];
     if (chars.length < 2) {
       el.innerHTML = `<div style="text-align:center;padding:20px;font-size:13px;color:var(--muted)">
@@ -1075,7 +1076,7 @@ function renderSplitContent() {
       </div>`;
       return;
     }
-    const charOpts = chars.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+    const charOpts = relationCharacterOptions(chars);
     el.innerHTML = `
       <div style="display:grid;gap:7px;margin-bottom:16px;padding:10px;background:var(--cream);border-radius:8px">
         <strong style="font-size:12px">관계 추가</strong>
@@ -1087,10 +1088,10 @@ function renderSplitContent() {
       <strong style="font-size:12px">관계 목록 (${rels.length})</strong>
       ${rels.length ? rels.map((r,i) => `
         <div style="display:flex;align-items:center;gap:5px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
-          <span style="font-weight:600">${esc(r.from)}</span>
+          <span style="font-weight:600">${esc(relationName(p, r, 'from'))}</span>
           <span style="color:var(--teal)">${esc(r.type)}</span>
-          <span style="font-weight:600">${esc(r.to)}</span>
-          <button onclick="deleteSplitRelation(${i})" aria-label="${esc(r.from)}와 ${esc(r.to)}의 관계 삭제"
+          <span style="font-weight:600">${esc(relationName(p, r, 'to'))}</span>
+          <button onclick="deleteSplitRelation(${i})" aria-label="${esc(relationName(p, r, 'from'))}와 ${esc(relationName(p, r, 'to'))}의 관계 삭제"
             style="margin-left:auto;background:none;border:none;color:var(--rust);cursor:pointer;font-size:16px">×</button>
         </div>`).join('') : '<div style="font-size:12px;color:var(--muted);padding:10px 0">등록된 관계가 없어요</div>'}
     `;
@@ -1194,12 +1195,10 @@ function addSplitRelation() {
   const from = splitElement('split-rel-from')?.value || '';
   const to = splitElement('split-rel-to')?.value || '';
   const type = splitElement('split-rel-type')?.value.trim() || '';
-  if (!from || !to || !type) { toast('인물과 관계 유형을 모두 입력해주세요.'); return; }
-  if (from === to) { toast('같은 인물은 선택할 수 없습니다.'); return; }
   const p = getProject();
   if (!p) return;
-  if (!p.relations) p.relations = [];
-  p.relations.push({ from, to, type });
+  const error = saveRelationData(p, from, to, type);
+  if (error) { toast(error); return; }
   autoSave();
   refreshSplitPanel();
 }

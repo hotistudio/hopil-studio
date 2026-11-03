@@ -579,13 +579,18 @@ button.stats-heatmap-day:focus-visible{outline:2px solid var(--gold);outline-off
 
 /* ═══ RELATION MAP ════════════════════════════════════════════ */
 .rel-map{display:grid;gap:10px}
-.rel-row{display:flex;align-items:center;gap:10px;padding:10px 14px;
+.rel-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:10px 14px;
   background:var(--cream);border-radius:8px;font-size:13px}
-.rel-from,.rel-to{font-weight:600;min-width:80px}
+.rel-from,.rel-to{font-weight:600;min-width:80px;overflow-wrap:anywhere}
 .rel-arrow{color:var(--muted);flex:1;text-align:center;font-size:12px;position:relative}
 .rel-arrow::before,.rel-arrow::after{content:'';position:absolute;top:50%;height:1px;
   background:var(--border);width:calc(50% - 20px)}
 .rel-arrow::before{left:0}.rel-arrow::after{right:0}
+.relation-presets{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.relation-presets .btn{padding:4px 7px;font-size:11px}
+.relation-actions{display:flex;flex-wrap:wrap;align-items:end;gap:6px}
+.relation-actions .btn{flex:1 1 auto}
+#rel-from-search,#rel-to-search{margin-bottom:6px}
 
 /* ═══ PLOT KANBAN ════════════════════════════════════════════ */
 .arc-list{display:flex;gap:14px;overflow-x:auto;padding-bottom:8px}

@@ -16,8 +16,8 @@ const focusFields = new Map([
   ['sg-alias-0', { value: '' }],
   ['sg-desc-0', { value: '수정된 설명' }],
   ['sg-related-0', { value: '' }],
-  ['split-rel-from', { value: '가' }],
-  ['split-rel-to', { value: '나' }],
+  ['split-rel-from', { value: 'a' }],
+  ['split-rel-to', { value: 'b' }],
   ['split-rel-type', { value: '친구' }]
 ]);
 const normalFields = new Map([['sg-term-0', { value: '잘못된 용어' }]]);
@@ -26,7 +26,7 @@ const normalPanel = { querySelector: selector => normalFields.get(selector.slice
 const overlay = { classList: { contains: () => true } };
 let saved = 0;
 let refreshed = 0;
-const project = { glossary: [{ term: '옛 용어', cat: '기타' }], characters: [{name:'가'}, {name:'나'}], relations: [] };
+const project = { glossary: [{ term: '옛 용어', cat: '기타' }], characters: [{id:'a',name:'가'}, {id:'b',name:'나'}], relations: [] };
 const context = vm.createContext({
   document: { getElementById: id => ({ 'focus-ref-panel': focusPanel, 'focus-overlay': overlay, 'split-panel': normalPanel })[id] || null },
   getProject: () => project,
@@ -43,9 +43,10 @@ vm.runInContext('saveSplitGlossary(0)', context);
 assert.equal(project.glossary[0].term, '새 용어');
 assert.equal(project.glossary[0].desc, '수정된 설명');
 
+vm.runInContext(part('let relationEditIndex', 'function renderRelations('), context);
 vm.runInContext(part('function addSplitRelation()', 'function renderSplitGlossary()'), context);
 vm.runInContext('addSplitRelation()', context);
-assert.deepEqual(JSON.parse(JSON.stringify(project.relations[0])), { from: '가', to: '나', type: '친구' });
+assert.deepEqual(JSON.parse(JSON.stringify(project.relations[0])), { fromId: 'a', toId: 'b', from: '가', to: '나', type: '친구' });
 vm.runInContext('deleteSplitRelation(0)', context);
 assert.equal(project.relations.length, 0);
 assert.equal(saved, 3);

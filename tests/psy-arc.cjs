@@ -39,6 +39,7 @@ const context = vm.createContext({
 vm.runInContext(section(features, 'function getPsyArcCharacter(', '// 배경색에 따라'), context);
 vm.runInContext(section(features, 'function savePsyArc(', 'function deletePsyArc('), context);
 vm.runInContext(section(features, 'function savePsyStep(', 'function deletePsyStep('), context);
+vm.runInContext(section(characters, 'function migrateRelationIds(', 'function relationCharacter('), context);
 vm.runInContext(section(characters, 'function saveChar(', 'function deleteChar('), context);
 context.ROLES = ['주인공'];
 context.CHAR_COLORS = [];

@@ -108,7 +108,7 @@ function loadFromStorage() {
 // ═══════════════════════════════════════════════════════════════
 // 현재 스키마 버전. 스키마를 바꿀 때마다 +1 하고 migrateProject 안에
 // 해당 버전용 블록을 추가한다. 멱등성을 지킬 것 (여러 번 실행해도 동일 결과).
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 /**
  * 가계도 스키마 v2 필드 정의 (참고용)
@@ -208,6 +208,10 @@ function migrateProject(p) {
       });
     }
   }
+
+  // v3 → v4: 서사 관계를 인물 이름 대신 ID로 연결한다.
+  // 동명이인은 임의로 선택하지 않고 기존 이름을 남겨 사용자가 확인하도록 한다.
+  if (from < 4) migrateRelationIds(p);
 
   p.schemaVersion = CURRENT_SCHEMA_VERSION;
   return true;

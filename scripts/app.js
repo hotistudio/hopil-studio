@@ -108,7 +108,7 @@ function loadFromStorage() {
 // ═══════════════════════════════════════════════════════════════
 // 현재 스키마 버전. 스키마를 바꿀 때마다 +1 하고 migrateProject 안에
 // 해당 버전용 블록을 추가한다. 멱등성을 지킬 것 (여러 번 실행해도 동일 결과).
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 /**
  * 가계도 스키마 v2 필드 정의 (참고용)
@@ -208,6 +208,10 @@ function migrateProject(p) {
       });
     }
   }
+
+  // v3 → v4: 서사 관계를 인물 이름 대신 ID로 연결한다.
+  // 동명이인은 임의로 선택하지 않고 기존 이름을 남겨 사용자가 확인하도록 한다.
+  if (from < 4) migrateRelationIds(p);
 
   p.schemaVersion = CURRENT_SCHEMA_VERSION;
   return true;
@@ -2536,6 +2540,7 @@ function saveChar(idx) {
   const name = document.getElementById('cm-name').value.trim();
   if (!name) { toast('이름을 입력해주세요.'); return; }
   const existing = idx !== undefined ? getProject().characters[idx] : null;
+  if (existing) migrateRelationIds(getProject());
   const c = {
     id: existing ? existing.id : uid(),
     name, role: document.getElementById('cm-role').value,
@@ -2570,6 +2575,12 @@ function saveChar(idx) {
   }
   if (idx !== undefined) p.characters[idx] = c;
   else p.characters.push(c);
+  if (existing && Array.isArray(p.relations)) {
+    p.relations.forEach(r => {
+      if (r.fromId != null && String(r.fromId) === String(c.id)) r.from = c.name;
+      if (r.toId != null && String(r.toId) === String(c.id)) r.to = c.name;
+    });
+  }
   // 이 인물과 연결된 가문 멤버(들)의 이름/나이/성별/생사 동기화
   if (c.id && Array.isArray(p.families)) {
     p.families.forEach(f => {
@@ -2612,7 +2623,13 @@ function deleteChar(idx) {
   confirmDialog('이 캐릭터를 삭제합니다.', () => {
     const p = getProject();
     const removedId = p.characters[idx]?.id;
+    migrateRelationIds(p);
+    relationEditIndex = -1;
     p.characters.splice(idx, 1);
+    if (removedId && Array.isArray(p.relations)) {
+      p.relations = p.relations.filter(r =>
+        String(r.fromId) !== String(removedId) && String(r.toId) !== String(removedId));
+    }
     // 다른 인물의 parents/spouses 및 가계도의 rootIds/overrides 에서 참조 제거
     if (removedId) cleanupCharacterReferences(p, removedId);
     autoSave();
@@ -2626,20 +2643,118 @@ function deleteChar(idx) {
 // ═══════════════════════════════════════════════════════════════
 // RELATIONS
 // ═══════════════════════════════════════════════════════════════
-function renderRelations() {
+let relationEditIndex = -1;
+const RELATION_TYPES = ['친구', '동료', '라이벌', '연인', '스승', '가족'];
+
+function migrateRelationIds(p) {
+  if (!Array.isArray(p?.relations)) return false;
+  let changed = false;
+  p.relations.forEach(r => {
+    for (const side of ['from', 'to']) {
+      const key = side + 'Id';
+      if (Object.prototype.hasOwnProperty.call(r, key) || !r[side]) continue;
+      const matches = (p.characters || []).filter(c => c.id != null && c.id !== '' && c.name === r[side]);
+      if (matches.length === 1) {
+        r[key] = String(matches[0].id);
+      } else {
+        // 애매하거나 사라진 이름은 이후 인물 목록이 변해도 자동 연결하지 않는다.
+        r[key] = null;
+      }
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+function relationCharacter(p, id) {
+  if (id == null || id === '') return null;
+  return (p.characters || []).find(c => c.id != null && String(c.id) === String(id));
+}
+
+function relationName(p, r, side) {
+  return relationCharacter(p, r[side + 'Id'])?.name || r[side] || '알 수 없음';
+}
+
+function relationCharacterOptions(chars, selectedId = '') {
+  return chars.map((c, i) => {
+    const duplicate = chars.some((other, j) => j !== i && other.name === c.name);
+    const label = duplicate ? `${c.name} · ${c.role || '역할 없음'} (${i + 1})` : c.name;
+    return `<option value="${esc(c.id)}" ${String(c.id) === String(selectedId) ? 'selected' : ''}>${esc(label)}</option>`;
+  }).join('');
+}
+
+function filterRelationSelect(searchId, selectId) {
+  const search = document.getElementById(searchId);
+  const select = document.getElementById(selectId);
+  if (!search || !select) return;
   const p = getProject();
+  const query = search.value.trim().toLocaleLowerCase();
+  const selectedId = select.value;
+  const chars = (p.characters || []).filter(c =>
+    !query || `${c.name} ${c.role || ''}`.toLocaleLowerCase().includes(query) || String(c.id) === selectedId
+  );
+  select.innerHTML = `<option value="">인물 선택</option>${relationCharacterOptions(chars, selectedId)}`;
+  select.value = selectedId;
+}
+
+function setRelationType(type) {
+  const input = document.getElementById('rel-type');
+  if (input) { input.value = type; input.focus(); }
+}
+
+function swapRelationCharacters() {
+  const from = document.getElementById('rel-from');
+  const to = document.getElementById('rel-to');
+  if (!from || !to) return;
+  const previous = from.value;
+  const next = to.value;
+  const fromSearch = document.getElementById('rel-from-search');
+  const toSearch = document.getElementById('rel-to-search');
+  if (fromSearch) fromSearch.value = '';
+  if (toSearch) toSearch.value = '';
+  const options = relationCharacterOptions(getProject().characters || []);
+  from.innerHTML = `<option value="">인물 선택</option>${options}`;
+  to.innerHTML = `<option value="">인물 선택</option>${options}`;
+  from.value = next;
+  to.value = previous;
+}
+
+function saveRelationData(p, fromId, toId, type, editIndex = -1) {
+  const from = relationCharacter(p, fromId);
+  const to = relationCharacter(p, toId);
+  const label = type.trim();
+  if (!from || !to || !label) return '인물과 관계 유형을 모두 입력해주세요.';
+  if (String(fromId) === String(toId)) return '같은 인물은 선택할 수 없습니다.';
+  if (!Array.isArray(p.relations)) p.relations = [];
+  const duplicate = p.relations.some((r, i) => i !== editIndex &&
+    String(r.fromId) === String(fromId) && String(r.toId) === String(toId) && (r.type || '').trim() === label);
+  if (duplicate) return '이미 같은 관계가 있습니다.';
+  const previous = editIndex >= 0 ? p.relations[editIndex] : null;
+  const next = { ...previous, fromId, toId, from: from.name, to: to.name, type: label };
+  if (editIndex >= 0) p.relations[editIndex] = next;
+  else p.relations.push(next);
+  return '';
+}
+
+function renderRelations(preserveEdit = false) {
+  const p = getProject();
+  if (!preserveEdit || relationEditIndex >= (p.relations || []).length) relationEditIndex = -1;
+  if (migrateRelationIds(p)) autoSave();
   const chars = p.characters || [];
   const rels = p.relations || [];
-  const charOpts = chars.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+  const editing = rels[relationEditIndex];
+  const charOpts = selectedId => relationCharacterOptions(chars, selectedId);
 
   const relList = rels.length === 0
     ? `<div style="text-align:center;padding:32px;color:var(--muted)">관계를 추가해보세요.</div>`
     : rels.map((r,i) => `
       <div class="rel-row">
-        <span class="rel-from">${esc(r.from)}</span>
+        <span class="rel-from">${esc(relationName(p, r, 'from'))}</span>
         <span class="rel-arrow">${esc(r.type)}</span>
-        <span class="rel-to">${esc(r.to)}</span>
-        <button class="btn-icon" onclick="deleteRelation(${i})" style="color:var(--rust);margin-left:auto">
+        <span class="rel-to">${esc(relationName(p, r, 'to'))}</span>
+        ${!relationCharacter(p, r.fromId) || !relationCharacter(p, r.toId) ? '<span class="tag" title="인물을 자동 연결하지 못했습니다">연결 확인 필요</span>' : ''}
+        <button class="btn btn-outline btn-sm" onclick="editRelation(${i})" style="margin-left:auto">수정</button>
+        <button class="btn-icon" onclick="deleteRelation(${i})" aria-label="관계 삭제" style="color:var(--rust)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>`).join('');
@@ -2651,12 +2766,13 @@ function renderRelations() {
         ? `<div class="card empty-state"><div class="emoji">🔗</div><p>등장인물을 2명 이상 추가하면<br>관계를 설정할 수 있습니다.</p></div>`
         : `
         <div class="card" style="margin-bottom:16px">
-          <div class="sec-title">관계 추가</div>
+          <div class="sec-title">${editing ? '관계 수정' : '관계 추가'}</div>
+          <div style="font-size:11px;color:var(--muted);margin:-8px 0 12px">여기서 만드는 서사 관계는 가계도의 부모·배우자 연결과 별도로 관리됩니다.</div>
           <div class="form-grid" style="align-items:end">
-            <div><label class="label">인물 A</label><select id="rel-from"><option value="">선택</option>${charOpts}</select></div>
-            <div><label class="label">관계 유형</label><input id="rel-type" placeholder="예: 연인, 라이벌, 스승, 형제"></div>
-            <div><label class="label">인물 B</label><select id="rel-to"><option value="">선택</option>${charOpts}</select></div>
-            <div><button class="btn btn-gold" style="width:100%" onclick="addRelation()">추가</button></div>
+            <div><label class="label" for="rel-from-search">인물 A</label><input id="rel-from-search" type="search" placeholder="이름 검색" oninput="filterRelationSelect('rel-from-search','rel-from')"><select id="rel-from" aria-label="인물 A"><option value="">인물 선택</option>${charOpts(editing?.fromId)}</select></div>
+            <div><label class="label" for="rel-to-search">인물 B</label><input id="rel-to-search" type="search" placeholder="이름 검색" oninput="filterRelationSelect('rel-to-search','rel-to')"><select id="rel-to" aria-label="인물 B"><option value="">인물 선택</option>${charOpts(editing?.toId)}</select></div>
+            <div><label class="label" for="rel-type">관계 유형</label><input id="rel-type" value="${esc(editing?.type || '')}" placeholder="예: 친구, 라이벌, 스승"><div class="relation-presets">${RELATION_TYPES.map(type => `<button type="button" class="btn btn-outline btn-sm" onclick="setRelationType(${jsArg(type)})">${esc(type)}</button>`).join('')}</div></div>
+            <div class="relation-actions"><button class="btn btn-outline" onclick="swapRelationCharacters()" title="인물 A와 B 바꾸기">⇄ 바꾸기</button><button class="btn btn-gold" onclick="addRelation()">${editing ? '변경 저장' : '추가'}</button>${editing ? '<button class="btn btn-outline" onclick="cancelRelationEdit()">취소</button>' : ''}</div>
           </div>
         </div>
         <div class="card">
@@ -2670,17 +2786,28 @@ function addRelation() {
   const from = document.getElementById('rel-from').value;
   const to = document.getElementById('rel-to').value;
   const type = document.getElementById('rel-type').value.trim();
-  if (!from || !to || !type) { toast('인물과 관계 유형을 모두 입력해주세요.'); return; }
-  if (from === to) { toast('같은 인물은 선택할 수 없습니다.'); return; }
   const p = getProject();
-  if (!p.relations) p.relations = [];
-  p.relations.push({from, to, type});
+  const error = saveRelationData(p, from, to, type, relationEditIndex);
+  if (error) { toast(error); return; }
+  relationEditIndex = -1;
   autoSave(); renderRelations();
 }
+function editRelation(i) {
+  relationEditIndex = i;
+  renderRelations(true);
+  document.getElementById('rel-type')?.focus();
+}
+function cancelRelationEdit() {
+  relationEditIndex = -1;
+  renderRelations();
+}
 function deleteRelation(i) {
-  getProject().relations.splice(i,1);
-  autoSave(); renderRelations();
-  toast('관계를 삭제했어요.');
+  confirmDialog('이 관계를 삭제할까요?', () => {
+    getProject().relations.splice(i, 1);
+    relationEditIndex = -1;
+    autoSave(); renderRelations();
+    toast('관계를 삭제했어요.');
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -6618,6 +6745,7 @@ function renderSplitContent() {
 
   } else if (splitTab === 'relations') {
     const chars = p.characters || [];
+    if (migrateRelationIds(p)) autoSave();
     const rels = p.relations || [];
     if (chars.length < 2) {
       el.innerHTML = `<div style="text-align:center;padding:20px;font-size:13px;color:var(--muted)">
@@ -6626,7 +6754,7 @@ function renderSplitContent() {
       </div>`;
       return;
     }
-    const charOpts = chars.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+    const charOpts = relationCharacterOptions(chars);
     el.innerHTML = `
       <div style="display:grid;gap:7px;margin-bottom:16px;padding:10px;background:var(--cream);border-radius:8px">
         <strong style="font-size:12px">관계 추가</strong>
@@ -6638,10 +6766,10 @@ function renderSplitContent() {
       <strong style="font-size:12px">관계 목록 (${rels.length})</strong>
       ${rels.length ? rels.map((r,i) => `
         <div style="display:flex;align-items:center;gap:5px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
-          <span style="font-weight:600">${esc(r.from)}</span>
+          <span style="font-weight:600">${esc(relationName(p, r, 'from'))}</span>
           <span style="color:var(--teal)">${esc(r.type)}</span>
-          <span style="font-weight:600">${esc(r.to)}</span>
-          <button onclick="deleteSplitRelation(${i})" aria-label="${esc(r.from)}와 ${esc(r.to)}의 관계 삭제"
+          <span style="font-weight:600">${esc(relationName(p, r, 'to'))}</span>
+          <button onclick="deleteSplitRelation(${i})" aria-label="${esc(relationName(p, r, 'from'))}와 ${esc(relationName(p, r, 'to'))}의 관계 삭제"
             style="margin-left:auto;background:none;border:none;color:var(--rust);cursor:pointer;font-size:16px">×</button>
         </div>`).join('') : '<div style="font-size:12px;color:var(--muted);padding:10px 0">등록된 관계가 없어요</div>'}
     `;
@@ -6745,12 +6873,10 @@ function addSplitRelation() {
   const from = splitElement('split-rel-from')?.value || '';
   const to = splitElement('split-rel-to')?.value || '';
   const type = splitElement('split-rel-type')?.value.trim() || '';
-  if (!from || !to || !type) { toast('인물과 관계 유형을 모두 입력해주세요.'); return; }
-  if (from === to) { toast('같은 인물은 선택할 수 없습니다.'); return; }
   const p = getProject();
   if (!p) return;
-  if (!p.relations) p.relations = [];
-  p.relations.push({ from, to, type });
+  const error = saveRelationData(p, from, to, type);
+  if (error) { toast(error); return; }
   autoSave();
   refreshSplitPanel();
 }
