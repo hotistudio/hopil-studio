@@ -275,11 +275,14 @@ function renderCharRelationTab(idx) {
   const spouseRows = c.spouses.map((sp, si) => {
     const spouse = byId.get(sp.charId);
     if (!spouse) return '';
-    return `<div style="display:flex;gap:8px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+    return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(spouse.name)}</div>
         <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(spouse.role||'')}</div>
       </div>
+      <select aria-label="가족관계 종류" onchange="setCrPartnerKind(${idx}, ${si}, this.value)" style="font-size:12px;width:auto">
+        ${partnerKindOptions(sp, c.id)}
+      </select>
       <select onchange="setCrSpouseStatus(${idx}, ${si}, this.value)" style="font-size:12px;width:auto;flex:none">
         ${[['current','현재'],['past','이별'],['deceased','사별']].map(([v,l])=>`<option value="${v}" ${sp.status===v?'selected':''}>${l}</option>`).join('')}
       </select>
@@ -337,16 +340,17 @@ function renderCharRelationTab(idx) {
       </div>
 
       <div>
-        <label class="label">배우자 / 혼인</label>
+        <label class="label">배우자 · 첩 · 후궁</label>
         <div>
-          ${spouseRows || '<div style="color:var(--muted);font-size:12px;padding:4px 0">등록된 배우자가 없습니다.</div>'}
+          ${spouseRows || '<div style="color:var(--muted);font-size:12px;padding:4px 0">등록된 배우자·첩·후궁 관계가 없습니다.</div>'}
         </div>
         ${spouseCandidates.length>0?`
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <select id="cr-spouse-add" style="flex:1">
-            <option value="">— 배우자 추가 —</option>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+          <select id="cr-spouse-add" style="flex:1;min-width:120px">
+            <option value="">— 관계 상대 추가 —</option>
             ${spouseCandidates.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}
           </select>
+          <select id="cr-partner-kind" aria-label="추가할 가족관계 종류" style="flex:1">${partnerKindOptions({}, c.id)}</select>
           <button class="btn btn-outline btn-sm" onclick="addCrSpouse(${idx})">＋ 추가</button>
         </div>`:''}
       </div>
@@ -513,7 +517,10 @@ function addCrSpouse(idx) {
     return;
   }
 
-  const nextSpouses = [...c.spouses, { id: uid(), charId: id, status: 'current', note: '' }];
+  const selection = document.getElementById('cr-partner-kind')?.value || 'marriage';
+  const [kind, side] = selection.split(':');
+  const nextSpouses = [...c.spouses, { id: uid(), charId: id, status: 'current', note: '', kind,
+    secondaryId: kind === 'marriage' ? '' : side === 'self' ? c.id : id }];
   syncSpouseLinks(p, c.id, nextSpouses);
   if (!charEditSession) autoSave();
   crRerender(idx);
@@ -525,6 +532,24 @@ function removeCrSpouse(idx, si) {
   if (!c || !Array.isArray(c.spouses)) return;
   const nextSpouses = c.spouses.filter((_, i) => i !== si);
   syncSpouseLinks(p, c.id, nextSpouses);
+  if (!charEditSession) autoSave();
+  crRerender(idx);
+}
+
+function partnerKindOptions(sp, selfId) {
+  const value = !sp.kind || sp.kind === 'marriage' ? 'marriage' : `${sp.kind}:${sp.secondaryId === selfId ? 'self' : 'other'}`;
+  return [['marriage','배우자'],['concubine:other','상대가 첩'],['concubine:self','이 인물이 첩'],['consort:other','상대가 후궁'],['consort:self','이 인물이 후궁']]
+    .map(([v,label]) => `<option value="${v}" ${value === v ? 'selected' : ''}>${label}</option>`).join('');
+}
+
+function setCrPartnerKind(idx, si, value) {
+  if (!['marriage','concubine:other','concubine:self','consort:other','consort:self'].includes(value)) return;
+  const p = getCharEditProject(), c = p.characters[idx], sp = c?.spouses?.[si];
+  if (!sp) return;
+  const [kind, side] = value.split(':');
+  sp.kind = kind;
+  sp.secondaryId = kind === 'marriage' ? '' : side === 'self' ? c.id : sp.charId;
+  syncSpouseLinks(p, c.id, c.spouses);
   if (!charEditSession) autoSave();
   crRerender(idx);
 }
@@ -766,7 +791,10 @@ function relationNetworkEdges(p) {
       const pair = [String(c.id), String(sp.charId)].sort().join('|');
       if (spousePairs.has(pair)) return;
       spousePairs.add(pair);
-      edges.push({ from: String(c.id), to: String(sp.charId), type: sp.status === 'past' ? '전 배우자' : sp.status === 'deceased' ? '사별' : '배우자', group: 'family', directed: false });
+      const kind = sp.kind === 'concubine' ? '첩' : sp.kind === 'consort' ? '후궁' : '배우자';
+      const secondary = kind !== '배우자' && [String(c.id), String(sp.charId)].includes(String(sp.secondaryId)) ? String(sp.secondaryId) : null;
+      edges.push({ from: secondary === String(c.id) ? String(sp.charId) : String(c.id),
+        to: secondary || String(sp.charId), type: kind + (sp.status === 'past' ? ' · 이별' : sp.status === 'deceased' ? ' · 사별' : ''), group: 'family', directed: !!secondary });
     });
   });
   (p.relations || []).forEach(r => {
@@ -850,6 +878,23 @@ function resetRelationNetworkView() {
   drawRelationNetwork();
 }
 
+function placeRelationLabel(x, y, width, bounds, occupied) {
+  for (let ring = 0; ring < 18; ring++) {
+    const count = ring ? 12 : 1;
+    for (let i = 0; i < count; i++) {
+      const angle = i * Math.PI * 2 / count;
+      const px = x + Math.cos(angle) * ring * 18;
+      const py = y + Math.sin(angle) * ring * 18;
+      const box = { x: px - width / 2, y: py - 12, w: width, h: 24 };
+      if (box.x < 2 || box.y < 2 || box.x + box.w > bounds.width - 2 || box.y + box.h > bounds.height - 2) continue;
+      if (occupied.some(b => box.x < b.x + b.w + 4 && box.x + box.w + 4 > b.x && box.y < b.y + b.h + 4 && box.y + box.h + 4 > b.y)) continue;
+      occupied.push(box);
+      return { x: px, y: py };
+    }
+  }
+  return null;
+}
+
 function drawRelationNetwork() {
   const svg = document.getElementById('rn-svg');
   const detail = document.getElementById('rn-detail');
@@ -877,6 +922,7 @@ function drawRelationNetwork() {
   }
   const positions = relationNetworkState.layout;
   const selected = relationNetworkState.selectedId;
+  const occupied = [...positions.values()].map(p => ({x:p.x-58,y:p.y-29,w:116,h:58}));
   const pairCounts = new Map();
   const paths = edges.map(e => {
     const a = positions.get(e.from), b = positions.get(e.to);
@@ -892,7 +938,12 @@ function drawRelationNetwork() {
     const endX = b.x - dx * endScale, endY = b.y - dy * endScale;
     const active = !selected || selected === e.from || selected === e.to;
     const color = e.group === 'family' ? 'var(--gold)' : 'var(--teal)';
-    return `<g class="rn-edge${active ? '' : ' dim'}"><path d="M ${a.x} ${a.y} Q ${midX * 2 - (a.x + b.x) / 2} ${midY * 2 - (a.y + b.y) / 2} ${endX} ${endY}" ${e.directed ? 'marker-end="url(#rn-arrow)"' : ''} fill="none" stroke="${color}" stroke-width="${active ? 2.4 : 1.4}" ${e.group === 'extra' ? 'stroke-dasharray="6 4"' : ''}/><rect x="${midX - Math.max(22, e.type.length * 6 + 7)}" y="${midY - 11}" width="${Math.max(44, e.type.length * 12 + 14)}" height="22" rx="10" class="rn-edge-label-bg"/><text x="${midX}" y="${midY + 4}" text-anchor="middle" class="rn-edge-label">${esc(e.type)}</text></g>`;
+    const shortLabel = e.type.length > 16 ? e.type.slice(0, 15) + '…' : e.type;
+    const labelWidth = Math.max(44, shortLabel.length * 12 + 14);
+    const label = active ? placeRelationLabel(midX, midY, labelWidth, {width,height}, occupied) : null;
+    const labelMarkup = label ? `<line x1="${midX}" y1="${midY}" x2="${label.x}" y2="${label.y}" stroke="var(--muted)" stroke-width="1"/><rect x="${label.x-labelWidth/2}" y="${label.y-11}" width="${labelWidth}" height="22" rx="10" class="rn-edge-label-bg"/><text x="${label.x}" y="${label.y+4}" text-anchor="middle" class="rn-edge-label">${esc(shortLabel)}</text>` : '';
+
+    return `<g class="rn-edge${active ? '' : ' dim'}"><path d="M ${a.x} ${a.y} Q ${midX * 2 - (a.x + b.x) / 2} ${midY * 2 - (a.y + b.y) / 2} ${endX} ${endY}" ${e.directed ? 'marker-end="url(#rn-arrow)"' : ''} fill="none" stroke="${color}" stroke-width="${active ? 2.4 : 1.4}" ${e.group === 'extra' ? 'stroke-dasharray="6 4"' : ''}/>${labelMarkup}<title>${esc(e.type)}</title></g>`;
   }).join('');
   const nodes = chars.map(c => {
     const pos = positions.get(String(c.id));
@@ -903,7 +954,7 @@ function drawRelationNetwork() {
   svg.innerHTML = `<defs><marker id="rn-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink)"/></marker></defs><g transform="translate(${relationNetworkState.panX},${relationNetworkState.panY}) scale(${relationNetworkState.zoom})">${paths}${nodes}</g>`;
   const person = chars.find(c => String(c.id) === selected);
   if (!person) {
-    detail.innerHTML = `<span>인물을 선택하면 연결된 관계가 강조됩니다.</span><span>${chars.length}명 · 표시된 연결 ${edges.length}개</span>`;
+    detail.innerHTML = `<span>인물을 선택하면 연결 관계가 강조됩니다. 공간이 부족한 이름표는 아래 관계 목록에서 확인하세요.</span><span>${chars.length}명 · 표시된 연결 ${edges.length}개</span>`;
   } else {
     const connected = edges.filter(e => e.from === selected || e.to === selected);
     detail.innerHTML = `<strong>${esc(person.name)}${person.lineageStatus ? ` · ${esc(person.lineageStatus)}` : ''}</strong>${connected.length ? connected.map(e => {

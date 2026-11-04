@@ -125,6 +125,8 @@ const CURRENT_SCHEMA_VERSION = 4;
  *   id:     string               // 혼인 id (재혼 추적용)
  *   charId: string               // 배우자 character id
  *   status: 'current'|'past'|'deceased'  // 현재/이별/사별
+ *   kind: 'marriage'|'concubine'|'consort' // 배우자/첩/후궁, 기존 데이터는 배우자
+ *   secondaryId: string          // 첩·후궁에 해당하는 인물 id
  *   note:   string               // 비고 (혼인 시기 등 자유 텍스트)
  *
  * FamilyTree:
@@ -406,7 +408,7 @@ function getDescendantIds(p, charId) {
  * 배우자 양방향 동기화.
  * A 의 spouses 를 desiredSpouses 로 설정하면서, B 쪽에도 A 링크가 있도록 맞춘다.
  * 제거된 배우자의 spouses 에서 A 링크를 제거한다.
- * status 는 A 쪽 설정을 따르되, B 가 이미 링크를 갖고 있으면 B 의 status 는 유지한다.
+ * 관계 종류, 지위에 해당하는 인물, 상태를 양쪽 링크에 동기화한다.
  */
 function syncSpouseLinks(p, charId, desiredSpouses) {
   if (!p || !Array.isArray(p.characters)) return;
@@ -434,15 +436,18 @@ function syncSpouseLinks(p, charId, desiredSpouses) {
     if (!other) return;
     if (!Array.isArray(other.spouses)) other.spouses = [];
     const existing = other.spouses.find(s => s.charId === charId);
+    const kind = ['concubine', 'consort'].includes(sp.kind) ? sp.kind : 'marriage';
+    const secondaryId = kind === 'marriage' ? '' : sp.secondaryId;
     if (!existing) {
       other.spouses.push({
         id: uid(),
         charId: charId,
         status: sp.status || 'current',
+        kind, secondaryId,
         note: ''
       });
     }
-    // 기존 링크가 있으면 status 는 건드리지 않음 (상대가 설정한 값 존중)
+    if (existing) Object.assign(existing, { kind, secondaryId, status: sp.status || 'current' });
   });
 
   // 내 spouses 를 최종 반영
@@ -450,6 +455,8 @@ function syncSpouseLinks(p, charId, desiredSpouses) {
     id: sp.id || uid(),
     charId: sp.charId,
     status: sp.status || 'current',
+    kind: sp.kind || 'marriage',
+    secondaryId: sp.secondaryId || '',
     note: sp.note || ''
   }));
 }
@@ -940,14 +947,22 @@ function ftDrawEdges(svg, chars, pos) {
         ? [pa.x + FT_NODE_W, y, pb.x, yb]
         : [pb.x + FT_NODE_W, yb, pa.x, y];
       const style = sp.status === 'deceased' ? 'stroke-dasharray="6,4"' :
-                    sp.status === 'past'     ? 'stroke-dasharray="2,4"' : '';
+                    sp.status === 'past' ? 'stroke-dasharray="2,4"' :
+                    sp.kind === 'consort' ? 'stroke-dasharray="9,3,2,3"' :
+                    sp.kind === 'concubine' ? 'stroke-dasharray="4,3"' : '';
       const color = sp.status === 'current' ? '#c4922a' : '#8a8378';
+      const partnerKind = sp.kind === 'concubine' ? '첩' : sp.kind === 'consort' ? '후궁' : '';
       if (ly === ry) {
         lines += `<line x1="${lx}" y1="${ly}" x2="${rx}" y2="${ry}" stroke="${color}" stroke-width="3" ${style}/>`;
       } else {
         // 세대 차이가 나는 부부 (드물지만) — L자 선
         const midX = (lx + rx) / 2;
         lines += `<polyline points="${lx},${ly} ${midX},${ly} ${midX},${ry} ${rx},${ry}" fill="none" stroke="${color}" stroke-width="3" ${style}/>`;
+      }
+      if (partnerKind) {
+        const secondary = byId.get(sp.secondaryId);
+        const label = `${secondary?.name || ''} · ${partnerKind}`;
+        lines += `<text x="${(lx + rx) / 2}" y="${(ly + ry) / 2 - 7}" text-anchor="middle" fill="var(--ink)" font-size="11" style="paint-order:stroke;stroke:var(--paper);stroke-width:4px">${esc(label)}</text>`;
       }
     });
   });

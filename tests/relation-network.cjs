@@ -59,3 +59,6 @@ vm.runInContext('resetRelationNetworkView()', context);
 assert.equal(vm.runInContext('relationNetworkState.zoom', context), 1);
 
 console.log('Relation network family links, extra links, filtering, selection, and layout passed.');
+
+const occupied=[{x:300,y:200,w:100,h:50}];
+for(let i=0;i<10;i++){const before=occupied.slice();const point=context.placeRelationLabel(350,225,90,{width:700,height:480},occupied);assert(point);const box=occupied.at(-1);assert(!before.some(b=>box.x<b.x+b.w&&box.x+box.w>b.x&&box.y<b.y+b.h&&box.y+box.h>b.y));}

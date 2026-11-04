@@ -26,7 +26,7 @@ async function main() {
   let downloaded;
   const android = vm.createContext({
     project, File: MockFile, navigator: {
-      userAgent: 'Android', canShare: ({ files }) => files[0].content.length > 0,
+      userAgent: 'Mozilla/5.0 (Linux; Android 14) SamsungBrowser/27.0 Chrome/125.0 Mobile Safari/537.36', canShare: ({ files }) => files[0].content.length > 0,
       share: async payload => { shared = payload; }
     },
     projectBackup: () => backup, getTodayStr: () => '20261101',
@@ -43,6 +43,15 @@ async function main() {
   android.navigator.canShare = () => false;
   assert.equal(await vm.runInContext('saveProjectBackup(project)', android), true);
   assert.match(JSON.stringify(downloaded[0]), /비어 있지 않은 원고/);
+
+  android.navigator.canShare = () => true;
+  downloaded = undefined;
+  android.navigator.share = async () => { const e = new Error('cancel'); e.name = 'AbortError'; throw e; };
+  assert.equal(await vm.runInContext('saveProjectBackup(project)', android), null);
+  assert.equal(downloaded, undefined, 'cancel must not trigger a second download');
+  android.navigator.share = undefined;
+  assert.equal(await vm.runInContext('saveProjectBackup(project)', android), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(downloaded[0])).project, project);
 
   let desktopDownload;
   const desktop = vm.createContext({

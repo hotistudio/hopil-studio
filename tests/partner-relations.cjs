@@ -1,0 +1,23 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync('scripts/app.js','utf8');
+function part(a,b){return source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a)));}
+const project={characters:[{id:'a',name:'군주',spouses:[{charId:'b',status:'current'}]},{id:'b',name:'인물',spouses:[{charId:'a',status:'current'}]}],relations:[]};
+const c=vm.createContext({getProject:()=>project,getCharEditProject:()=>project,charEditSession:null,uid:()=> 'link',autoSave(){},crRerender(){},esc:s=>String(s),FT_NODE_W:130,FT_NODE_H:64});
+vm.runInContext(part('function syncSpouseLinks(','const FT_NODE_W'),c);
+vm.runInContext(part('function partnerKindOptions(','function setCrSpouseStatus('),c);
+vm.runInContext(part('const relationNetworkState =','function renderRelations('),c);
+vm.runInContext(part('function ftDrawEdges(','function ftSelectNode('),c);
+c.setCrPartnerKind(0,0,'consort:other');
+assert.equal(project.characters[1].spouses[0].kind,'consort');
+assert.equal(project.characters[1].spouses[0].secondaryId,'b');
+assert.match(c.partnerKindOptions(project.characters[1].spouses[0],'b'),/value="consort:self" selected/);
+let edge=c.relationNetworkEdges(project)[0];
+assert.equal(edge.type,'후궁');assert.equal(edge.from,'a');assert.equal(edge.to,'b');assert(edge.directed);
+const svg={innerHTML:''};c.ftDrawEdges(svg,project.characters,new Map([['a',{x:0,y:0}],['b',{x:180,y:0}]]));
+assert(svg.innerHTML.includes('인물 · 후궁'));
+c.setCrPartnerKind(1,0,'concubine:self');
+assert.equal(project.characters[0].spouses[0].kind,'concubine');
+const restored=JSON.parse(JSON.stringify(project));
+assert.equal(c.relationNetworkEdges(restored)[0].type,'첩');
+c.syncSpouseLinks(project,'a',[]);assert.equal(project.characters[1].spouses.length,0);
+console.log('Partner types, reciprocal roles, tree labels, graph direction, roundtrip, and removal passed.');
