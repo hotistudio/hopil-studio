@@ -81,3 +81,20 @@ assert(!svg.innerHTML.includes('data-id="alone"'));
 vm.runInContext("setRelationNetworkFilter('isolated',true)",context);
 assert(svg.innerHTML.includes('data-id="alone"'));
 console.log('Large casts, component spacing, and isolated-character visibility passed.');
+
+// A third card between two people must not hide any segment or the arrow tip.
+const obstaclePositions=new Map([['a',{x:100,y:140}],['block',{x:300,y:140}],['b',{x:500,y:140}]]);
+for(const index of [0,1,2]) {
+  const route=context.routeRelationEdge(obstaclePositions.get('a'),obstaclePositions.get('b'),obstaclePositions,index);
+  assert(route.length>2,'Blocked connection must detour');
+  for(let i=1;i<route.length;i++)for(let t=0;t<=100;t++){
+    const x=route[i-1].x+(route[i].x-route[i-1].x)*t/100;
+    const y=route[i-1].y+(route[i].y-route[i-1].y)*t/100;
+    for(const p of obstaclePositions.values())assert(Math.abs(x-p.x)>=60 || Math.abs(y-p.y)>=31,'Route must clear every visible card');
+  }
+  const tip=route.at(-1),target=obstaclePositions.get('b');
+  assert(Math.abs(tip.x-target.x)>=65.9 || Math.abs(tip.y-target.y)>=36.9,'Arrow must end outside target');
+}
+assert(context.relationSegmentBlocked({x:0,y:0},{x:100,y:0},[{x:40,y:-10,w:20,h:20}]));
+assert(!context.relationSegmentBlocked({x:0,y:30},{x:100,y:30},[{x:40,y:-10,w:20,h:20}]));
+console.log('Obstacle detours, parallel relations, and arrow clearance passed.');

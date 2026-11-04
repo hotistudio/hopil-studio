@@ -925,6 +925,44 @@ function placeRelationLabel(x, y, width, bounds, occupied) {
   return null;
 }
 
+// 선분이 카드의 여유 영역 내부를 통과하는지 검사한다.
+function relationSegmentBlocked(a, b, boxes) {
+  return boxes.some(r => {
+    let lo=0, hi=1;
+    for (const axis of ['x','y']) {
+      const min=r[axis]+.01, max=r[axis]+r[axis==='x'?'w':'h']-.01;
+      const delta=b[axis]-a[axis];
+      if(Math.abs(delta)<1e-9){if(a[axis]<=min || a[axis]>=max)return false;}
+      else {const t1=(min-a[axis])/delta,t2=(max-a[axis])/delta;lo=Math.max(lo,Math.min(t1,t2));hi=Math.min(hi,Math.max(t1,t2));}
+    }
+    return lo<hi && hi>0 && lo<1;
+  });
+}
+
+function routeRelationEdge(a, b, positions, index=0) {
+  const boxes=[...positions.values()].map(p=>({x:p.x-66,y:p.y-37,w:132,h:74}));
+  const angle=Math.atan2(b.y-a.y,b.x-a.x);
+  const offset=index ? Math.ceil(index/2)*.22*(index%2?1:-1) : 0;
+  const port=(p,theta)=>{const dx=Math.cos(theta),dy=Math.sin(theta),t=Math.min(66/Math.max(1e-9,Math.abs(dx)),37/Math.max(1e-9,Math.abs(dy)));return {x:p.x+dx*t,y:p.y+dy*t};};
+  const start=port(a,angle+offset),end=port(b,angle+Math.PI-offset);
+  if(!relationSegmentBlocked(start,end,boxes))return [start,end];
+  const vertices=[start,end,...boxes.flatMap(r=>[{x:r.x,y:r.y},{x:r.x+r.w,y:r.y},{x:r.x,y:r.y+r.h},{x:r.x+r.w,y:r.y+r.h}])];
+  const costs=vertices.map(()=>Infinity),prev=vertices.map(()=>-1),seen=new Set();costs[0]=0;
+  for(let step=0;step<vertices.length;step++){
+    let u=-1;for(let i=0;i<vertices.length;i++)if(!seen.has(i)&&(u<0||costs[i]<costs[u]))u=i;
+    if(u<0 || !Number.isFinite(costs[u]))break;
+    if(u===1){const path=[];for(let i=1;i!==-1;i=prev[i])path.unshift(vertices[i]);return path;}
+    seen.add(u);
+    for(let v=0;v<vertices.length;v++){
+      if(seen.has(v))continue;
+      const cost=costs[u]+Math.hypot(vertices[v].x-vertices[u].x,vertices[v].y-vertices[u].y);
+      if(cost>=costs[v] || relationSegmentBlocked(vertices[u],vertices[v],boxes))continue;
+      costs[v]=cost;prev[v]=u;
+    }
+  }
+  return []; // 통과 경로가 없으면 카드 뒤로 잘못된 선을 그리지 않는다.
+}
+
 function drawRelationNetwork() {
   const svg = document.getElementById('rn-svg');
   const detail = document.getElementById('rn-detail');
@@ -952,6 +990,7 @@ function drawRelationNetwork() {
   if (relationNetworkState.layoutKey !== layoutKey) {
     relationNetworkState.layout = relationNetworkLayout(chars, edges, width, height);
     relationNetworkState.layoutKey = layoutKey;
+    relationNetworkState.routes = new Map();
   }
   const positions = relationNetworkState.layout;
   const selected = relationNetworkState.selectedId;
@@ -967,12 +1006,13 @@ function drawRelationNetwork() {
     const key = [e.from, e.to].sort().join('|');
     const index = pairCounts.get(key) || 0;
     pairCounts.set(key, index + 1);
-    const dx = b.x - a.x, dy = b.y - a.y, length = Math.max(1, Math.hypot(dx, dy));
-    const offset = index ? (Math.ceil(index / 2) * 28 * (index % 2 ? 1 : -1)) : 0;
-    const midX = (a.x + b.x) / 2 - dy / length * offset;
-    const midY = (a.y + b.y) / 2 + dx / length * offset;
-    const endScale = Math.min(.45, Math.min(58 / Math.max(.01, Math.abs(dx)), 29 / Math.max(.01, Math.abs(dy))));
-    const endX = b.x - dx * endScale, endY = b.y - dy * endScale;
+    const routeKey=key+':'+e.from+':'+index;
+    if(!relationNetworkState.routes.has(routeKey))relationNetworkState.routes.set(routeKey,routeRelationEdge(a,b,positions,index));
+    const route=relationNetworkState.routes.get(routeKey);
+    if(route.length<2)return '';
+    const segment=Math.floor((route.length-1)/2);
+    const midX=(route[segment].x+route[segment+1].x)/2,midY=(route[segment].y+route[segment+1].y)/2;
+    const pathData=route.map((point,i)=>(i?'L':'M')+' '+point.x+' '+point.y).join(' ');
     const active = !selected || selected === e.from || selected === e.to;
     const color = e.group === 'family' ? 'var(--gold)' : 'var(--teal)';
     const shortLabel = e.type.length > 16 ? e.type.slice(0, 15) + '…' : e.type;
@@ -980,7 +1020,7 @@ function drawRelationNetwork() {
     const label = active && (selected || relationNetworkState.showLabels || chars.length <= 12) ? placeRelationLabel(midX, midY, labelWidth, bounds, occupied) : null;
     const labelMarkup = label ? `<line x1="${midX}" y1="${midY}" x2="${label.x}" y2="${label.y}" stroke="var(--muted)" stroke-width="1"/><rect x="${label.x-labelWidth/2}" y="${label.y-11}" width="${labelWidth}" height="22" rx="10" class="rn-edge-label-bg"/><text x="${label.x}" y="${label.y+4}" text-anchor="middle" class="rn-edge-label">${esc(shortLabel)}</text>` : '';
 
-    return `<g class="rn-edge${active ? '' : ' dim'}"><path d="M ${a.x} ${a.y} Q ${midX * 2 - (a.x + b.x) / 2} ${midY * 2 - (a.y + b.y) / 2} ${endX} ${endY}" ${e.directed ? 'marker-end="url(#rn-arrow)"' : ''} fill="none" stroke="${color}" stroke-width="${active ? 2.4 : 1.4}" ${e.group === 'extra' ? 'stroke-dasharray="6 4"' : ''}/>${labelMarkup}<title>${esc(e.type)}</title></g>`;
+    return `<g class="rn-edge${active ? '' : ' dim'}"><path d="${pathData}" stroke-linejoin="round" stroke-linecap="round" ${e.directed ? 'marker-end="url(#rn-arrow)"' : ''} fill="none" stroke="${color}" stroke-width="${active ? 2.4 : 1.4}" ${e.group === 'extra' ? 'stroke-dasharray="6 4"' : ''}/>${labelMarkup}<title>${esc(e.type)}</title></g>`;
   }).join('');
   const nodes = chars.map(c => {
     const pos = positions.get(String(c.id));
@@ -988,7 +1028,7 @@ function drawRelationNetwork() {
     const description = [c.lineageStatus, c.role].filter(Boolean).join(' · ');
     return `<g class="rn-node${selected === String(c.id) ? ' selected' : ''}${active ? '' : ' dim'}" data-id="${esc(c.id)}" transform="translate(${pos.x},${pos.y})" tabindex="0" role="button" aria-label="${esc(c.name)}${c.lineageStatus ? `, ${esc(c.lineageStatus)}` : ''} 관계 보기"><rect x="-54" y="-25" width="108" height="50" rx="12"/><text text-anchor="middle" y="-1" class="rn-node-name">${esc(c.name.length > 9 ? c.name.slice(0, 8) + '…' : c.name)}</text><text text-anchor="middle" y="16" class="rn-node-role">${esc(description.length > 12 ? description.slice(0, 11) + '…' : description)}</text></g>`;
   }).join('');
-  svg.innerHTML = `<defs><marker id="rn-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink)"/></marker></defs><g transform="translate(${relationNetworkState.panX},${relationNetworkState.panY}) scale(${scale})">${paths}${nodes}</g>`;
+  svg.innerHTML = `<defs><marker id="rn-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink)"/></marker></defs><g transform="translate(${relationNetworkState.panX},${relationNetworkState.panY}) scale(${scale})">${paths}${nodes}</g>`;
   const person = chars.find(c => String(c.id) === selected);
   if (!person) {
     detail.innerHTML = `<span>인물을 누르면 해당 관계 이름과 목록을 볼 수 있습니다. 드래그로 이동하고 ＋로 확대하세요.</span><span>${chars.length}명 · 연결 ${edges.length}개${!relationNetworkState.showIsolated && isolatedCount ? ` · 연결 없는 인물 ${isolatedCount}명 숨김` : ''}</span>`;
