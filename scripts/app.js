@@ -469,7 +469,7 @@ function syncSpouseLinks(p, charId, desiredSpouses) {
 // 배우자는 수평선으로 연결하고 자식들은 그 중간점에서 수직 분기한다.
 
 const FT_NODE_W = 130;     // 노드 너비 (CSS min-width 기준)
-const FT_NODE_H = 64;      // 노드 높이 추정치
+const FT_NODE_H = 96;      // 실제 카드와 연결선이 공유하는 높이
 const FT_H_GAP  = 24;      // 같은 세대 내 인물 간 수평 간격
 const FT_V_GAP  = 80;      // 세대 간 수직 간격
 const FT_COUPLE_GAP = 12;  // 배우자 사이 수평 간격 (노드 간 여백)
@@ -908,7 +908,7 @@ function ftDrawTree() {
     if (c.role) metaBits.push(esc(c.role));
     const meta = metaBits.length ? `<div class="ft-node-meta">${metaBits.join(' · ')}</div>` : '';
     return `<div class="ft-node${selected}${deadCls}" data-char-id="${c.id}"
-      style="left:${pt.x}px;top:${pt.y}px;min-width:${FT_NODE_W}px"
+      style="left:${pt.x}px;top:${pt.y}px;width:${FT_NODE_W}px;height:${FT_NODE_H}px"
       onclick="ftSelectNode('${c.id}')"
       ondblclick="ftOpenCharModal('${c.id}')">
       ${genderSymbol?`<div class="ft-node-gender">${genderSymbol}</div>`:''}
@@ -1001,8 +1001,15 @@ function ftDrawEdges(svg, chars, pos) {
     const childTopY = Math.min(...kidCenters.map(k => k.y));
     const busY = parentBottomY + (childTopY - parentBottomY) / 2;
 
-    // (1) 등록된 부모의 중심에서 수직으로 bus 까지
-    lines += `<line x1="${centerX}" y1="${parentBottomY}" x2="${centerX}" y2="${busY}" stroke="#6b5f4f" stroke-width="2.5"/>`;
+    // 등록된 부모 각각의 카드 하단에서 공통 분기선까지 연결한다.
+    parentCenters.forEach(parent => {
+      lines += `<line x1="${parent.x}" y1="${parent.y}" x2="${parent.x}" y2="${busY}" stroke="#6b5f4f" stroke-width="2.5"/>`;
+    });
+    const parentMinX = Math.min(...parentCenters.map(parent => parent.x));
+    const parentMaxX = Math.max(...parentCenters.map(parent => parent.x));
+    if (parentMinX !== parentMaxX) {
+      lines += `<line x1="${parentMinX}" y1="${busY}" x2="${parentMaxX}" y2="${busY}" stroke="#6b5f4f" stroke-width="2.5"/>`;
+    }
 
     // (2) bus 가로선 (최좌/최우 자식까지)
     if (kidCenters.length > 1) {
@@ -1025,7 +1032,7 @@ function ftDrawEdges(svg, chars, pos) {
     });
   });
 
-  svg.innerHTML = lines;
+  svg.innerHTML = `<g stroke-linecap="round" stroke-linejoin="round">${lines}</g>`;
 }
 
 function ftSelectNode(id) {

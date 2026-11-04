@@ -484,7 +484,7 @@ html[data-reader-style="forest"] #focus-editor::placeholder{color:#b7c9bf;opacit
   text-align:center;font-family:'Noto Sans KR',sans-serif;cursor:pointer;
   box-shadow:0 2px 6px rgba(0,0,0,.06);transition:box-shadow .15s,transform .15s;
   user-select:none;overflow:hidden}
-.ft-node:hover{box-shadow:0 4px 12px rgba(196,146,42,.25);transform:translateY(-1px)}
+.ft-node:hover{box-shadow:0 4px 12px rgba(196,146,42,.25)}
 .ft-node.selected{outline:3px solid var(--gold);outline-offset:2px}
 #ft-edit-selected:disabled{opacity:.45;cursor:default}
 .ft-node.deceased{opacity:.7}

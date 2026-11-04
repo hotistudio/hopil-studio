@@ -62,3 +62,9 @@ context.ftSelectNode('child');
 assert.equal(editButton.disabled, true);
 
 console.log('Family tree parent edge and selected character editing passed.');
+
+context.ftDrawEdges(svg, [{ id: 'parent' }, { id: 'spouse' }, { id: 'child', parents: ['parent', 'spouse'] }], positions);
+assert.match(svg.innerHTML, /<line x1="65" y1="64" x2="65" y2="104"/);
+assert.match(svg.innerHTML, /<line x1="265" y1="64" x2="265" y2="104"/);
+assert.match(svg.innerHTML, /<line x1="65" y1="104" x2="265" y2="104"/);
+assert.match(renderedNodes.innerHTML, /width:130px;height:64px/);
