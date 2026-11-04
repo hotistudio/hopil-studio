@@ -8720,7 +8720,26 @@ function closeModal() {
     renderDiagramCanvas();
   }
 }
-// Ctrl+S 브라우저 기본 동작 완전 차단 (캡처 단계)
+// Ctrl+S / Cmd+S: 입력 언어와 무관하게 현재 작품 파일 저장.
+let shortcutSavePending = false;
+async function handleProjectSaveShortcut(e) {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey ||
+      !(e.code === 'KeyS' || String(e.key).toLowerCase() === 's')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.repeat || e.isComposing || shortcutSavePending) return;
+  shortcutSavePending = true;
+  try {
+    await exportCurrentProject();
+  } catch (error) {
+    console.error('단축키 저장 실패:', error);
+    toast('파일 저장에 실패했어요. 다시 시도해주세요.');
+  } finally {
+    shortcutSavePending = false;
+  }
+}
+window.addEventListener('keydown', handleProjectSaveShortcut, true);
+// 나머지 전역 단축키 (캡처 단계)
 window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
     if (state.activeTab === 'chapters') {
@@ -8737,10 +8756,6 @@ window.addEventListener('keydown', e => {
       openGlobalSearch();
     }
   }
-  // Ctrl+S 경고 배너 표시
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    showCtrlSWarning();
-  }
   if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
     if (getProject() && state.activeTab === 'chapters') {
       e.preventDefault();
@@ -8749,32 +8764,6 @@ window.addEventListener('keydown', e => {
     }
   }
 }, true);
-
-function showCtrlSWarning() {
-  const existing = document.getElementById('ctrls-warning');
-  if (existing) { existing.remove(); }
-  const banner = document.createElement('div');
-  banner.id = 'ctrls-warning';
-  banner.style.cssText = `
-    position:fixed;top:50%;left:50%;
-    transform:translate(-50%,-50%);
-    background:rgba(181,69,27,.95);
-    color:#fff;padding:18px 28px;border-radius:16px;
-    font-size:14px;font-weight:700;
-    font-family:'Noto Sans KR',sans-serif;
-    line-height:1.8;text-align:center;
-    z-index:99999;pointer-events:none;
-    box-shadow:0 8px 32px rgba(0,0,0,.3);
-    opacity:0;transition:opacity .15s;
-  `;
-  banner.innerHTML = '⚠️ Ctrl+S는 브라우저 페이지 저장 단축키예요<br><span style="font-size:12px;font-weight:400;opacity:.85">파일 저장은 💾 파일 저장 버튼을 사용해주세요</span>';
-  document.body.appendChild(banner);
-  requestAnimationFrame(() => { banner.style.opacity = '1'; });
-  setTimeout(() => {
-    banner.style.opacity = '0';
-    setTimeout(() => banner.remove(), 200);
-  }, 2500);
-}
 
 document.addEventListener('keydown', e => {
   // ESC → 모달 닫기

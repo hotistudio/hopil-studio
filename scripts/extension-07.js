@@ -1,30 +1,6 @@
 (function AuxPatch() {
   'use strict';
 
-  // ─── 1. Ctrl+S 실제 저장 ───────────────────────────────────────
-  // 원본의 showCtrlSWarning 을 덮어씀. preventDefault 로 브라우저
-  // 기본 동작 차단 + exportCurrentProject 호출.
-  window.showCtrlSWarning = function () {
-    // 이 함수는 원본에서 Ctrl+S 감지 시 호출됨
-    // 호출 타이밍에 activeElement 가 textarea 면 입력 흐름 방해 안 되게
-    // 그냥 저장만 조용히 실행.
-    if (typeof exportCurrentProject === 'function' && state.activeProjectId) {
-      exportCurrentProject();
-    } else if (typeof toast === 'function') {
-      toast('작품을 열고 사용해주세요');
-    }
-  };
-
-  // 원본 keydown 리스너가 이미 capture 로 돌고 있어서
-  // preventDefault 를 우리가 다시 해줘야 브라우저 기본 동작 차단됨.
-  window.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
-      e.preventDefault();
-      e.stopPropagation();
-      // showCtrlSWarning 은 원본이 호출하지만, 우리가 덮어썼으니 OK
-    }
-  }, true);
-
   // ─── 2. 스냅샷 복원 UI ─────────────────────────────────────────
   // data safety 패치가 listSnapshots / restoreSnapshot 을 window 에 노출함.
   // 둘 다 존재할 때만 UI 작동.
