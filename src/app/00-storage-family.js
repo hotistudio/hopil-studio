@@ -978,58 +978,70 @@ function ftDrawEdges(svg, chars, pos) {
     unitsByParents.get(key).children.push(c);
   });
 
-  unitsByParents.forEach(({parentIds, children}) => {
-    // 등록된 부모만 연결한다. 배우자 관계만으로 공동 부모를 추정하지 않는다.
-    const parentCenters = parentIds.map(pid => {
-      const pp = pos.get(pid);
-      return pp ? { x: pp.x + FT_NODE_W/2, y: pp.y + FT_NODE_H } : null;
-    }).filter(Boolean);
-    if (parentCenters.length === 0) return;
-
-    // 부모가 2명이면 그 중간, 1명이면 그 아래
-    const centerX = parentCenters.reduce((a,b)=>a+b.x, 0) / parentCenters.length;
-    const parentBottomY = Math.max(...parentCenters.map(p => p.y));
-
-    // 자식 중심점들
-    const kidCenters = children.map(c => {
-      const kp = pos.get(c.id);
-      return kp ? { x: kp.x + FT_NODE_W/2, y: kp.y, id: c.id } : null;
-    }).filter(Boolean);
-    if (kidCenters.length === 0) return;
-
-    // 자식 Y 최솟값을 분기점 기준으로
-    const childTopY = Math.min(...kidCenters.map(k => k.y));
-    const busY = parentBottomY + (childTopY - parentBottomY) / 2;
-
-    // 등록된 부모 각각의 카드 하단에서 공통 분기선까지 연결한다.
-    parentCenters.forEach(parent => {
-      lines += `<line x1="${parent.x}" y1="${parent.y}" x2="${parent.x}" y2="${busY}" stroke="#6b5f4f" stroke-width="2.5"/>`;
+  // 부모 조합별 경로와 카드 출구를 분리해 다른 가족의 선이 합쳐지지 않게 한다.
+  const routes = [...unitsByParents.values()].map(({parentIds, children}) => {
+    const parents = parentIds.filter(id => pos.has(id)).map(id => ({
+      id, x: pos.get(id).x + FT_NODE_W / 2, y: pos.get(id).y + FT_NODE_H
+    }));
+    const kids = children.filter(c => pos.has(c.id)).map(c => ({
+      x: pos.get(c.id).x + FT_NODE_W / 2, y: pos.get(c.id).y
+    }));
+    if (!parents.length || !kids.length) return null;
+    return { parents, kids, top: Math.max(...parents.map(p => p.y)), bottom: Math.min(...kids.map(k => k.y)) };
+  }).filter(Boolean);
+  const parentRoutes = new Map();
+  routes.forEach(route => route.parents.forEach(parent => {
+    if (!parentRoutes.has(parent.id)) parentRoutes.set(parent.id, []);
+    parentRoutes.get(parent.id).push({ route, parent });
+  }));
+  parentRoutes.forEach(entries => {
+    const targetX = entry => {
+      const others = entry.route.parents.filter(p => p.id !== entry.parent.id);
+      const targets = others.length ? others : entry.route.kids;
+      return targets.reduce((sum, p) => sum + p.x, 0) / targets.length;
+    };
+    entries.sort((a,b) => targetX(a) - targetX(b));
+    const spacing = Math.min(16, (FT_NODE_W - 24) / Math.max(1, entries.length - 1));
+    entries.forEach((entry,index) => {
+      entry.parent.x += (index - (entries.length - 1) / 2) * spacing;
     });
-    const parentMinX = Math.min(...parentCenters.map(parent => parent.x));
-    const parentMaxX = Math.max(...parentCenters.map(parent => parent.x));
-    if (parentMinX !== parentMaxX) {
-      lines += `<line x1="${parentMinX}" y1="${busY}" x2="${parentMaxX}" y2="${busY}" stroke="#6b5f4f" stroke-width="2.5"/>`;
-    }
-
-    // (2) bus 가로선 (최좌/최우 자식까지)
-    if (kidCenters.length > 1) {
-      const minKX = Math.min(...kidCenters.map(k => k.x));
-      const maxKX = Math.max(...kidCenters.map(k => k.x));
-      const busStartX = Math.min(centerX, minKX);
-      const busEndX   = Math.max(centerX, maxKX);
-      lines += `<line x1="${busStartX}" y1="${busY}" x2="${busEndX}" y2="${busY}" stroke="#6b5f4f" stroke-width="2.5"/>`;
-    } else {
-      // 자식이 1명이고 그 자식의 X가 centerX와 다르면 가로선으로 연결
-      const kx = kidCenters[0].x;
-      if (Math.abs(kx - centerX) > 0.5) {
-        lines += `<line x1="${centerX}" y1="${busY}" x2="${kx}" y2="${busY}" stroke="#6b5f4f" stroke-width="2.5"/>`;
-      }
-    }
-
-    // (3) 각 자식 수직선
-    kidCenters.forEach(k => {
-      lines += `<line x1="${k.x}" y1="${busY}" x2="${k.x}" y2="${k.y}" stroke="#6b5f4f" stroke-width="2.5"/>`;
+  });
+  const bands = new Map();
+  routes.forEach(route => {
+    route.minX = Math.min(...route.parents.concat(route.kids).map(p => p.x));
+    route.maxX = Math.max(...route.parents.concat(route.kids).map(p => p.x));
+    const key = route.top + '|' + route.bottom;
+    if (!bands.has(key)) bands.set(key, []);
+    bands.get(key).push(route);
+  });
+  bands.forEach(band => {
+    const lanes = [];
+    band.sort((a,b) => a.minX - b.minX || a.maxX - b.maxX);
+    band.forEach(route => {
+      let lane = lanes.findIndex(endX => endX + 24 < route.minX);
+      if (lane < 0) lane = lanes.length;
+      lanes[lane] = route.maxX;
+      route.lane = lane;
     });
+    band.forEach(route => {
+      route.busY = route.top + (route.bottom - route.top) * (route.lane + 1) / (lanes.length + 1);
+    });
+  });
+  routes.forEach(route => {
+    const { parents, kids, busY, minX, maxX } = route;
+    let segments = '';
+    const line = (x1,y1,x2,y2) => {
+      if (x1 === x2 && y1 === y2) return;
+      segments += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    };
+    parents.forEach(p => line(p.x, p.y, p.x, busY));
+    line(minX, busY, maxX, busY);
+    kids.forEach(k => line(k.x, busY, k.x, k.y));
+    // 다른 가족의 선과 교차하면 배경색 테두리로 분리하고, 실제 분기점만 점으로 표시한다.
+    const junctions = [...new Set(parents.concat(kids).map(p => p.x))]
+      .filter(x => x > minX && x < maxX)
+      .map(x => `<circle cx="${x}" cy="${busY}" r="3" fill="#6b5f4f"/>`).join('');
+    lines += `<g class="ft-parent-route"><g stroke="var(--paper)" stroke-width="7">${segments}</g><g stroke="#6b5f4f" stroke-width="2.5">${segments}</g>${junctions}</g>`;
   });
 
   svg.innerHTML = `<g stroke-linecap="round" stroke-linejoin="round">${lines}</g>`;

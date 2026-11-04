@@ -68,3 +68,28 @@ assert.match(svg.innerHTML, /<line x1="65" y1="64" x2="65" y2="104"/);
 assert.match(svg.innerHTML, /<line x1="265" y1="64" x2="265" y2="104"/);
 assert.match(svg.innerHTML, /<line x1="65" y1="104" x2="265" y2="104"/);
 assert.match(renderedNodes.innerHTML, /width:130px;height:64px/);
+
+// Reproduce two children with one shared parent and different other parents.
+const blended = [
+  { id: 'a' }, { id: 'b' }, { id: 'c' },
+  { id: 'ab', parents: ['a', 'b'] }, { id: 'bc', parents: ['b', 'c'] },
+  { id: 'unrelated', relations: [{ targetId: 'b', type: '내연 상대' }] }
+];
+const blendedPos = new Map([
+  ['a', {x:0,y:0}], ['b', {x:154,y:0}], ['c', {x:308,y:0}],
+  ['ab', {x:77,y:144}], ['bc', {x:231,y:144}], ['unrelated', {x:500,y:0}]
+]);
+const originalData = JSON.stringify(blended);
+context.ftDrawEdges(svg, blended, blendedPos);
+const routes = svg.innerHTML.split('<g class="ft-parent-route">').slice(1);
+assert.equal(routes.length, 2, 'Additional relations must not create parent routes');
+const segments = routes.map(route => [...route.matchAll(/<line x1="([^"]+)" y1="([^"]+)" x2="([^"]+)" y2="([^"]+)"/g)].map(m => m.slice(1).map(Number)));
+const buses = segments.map(lines => lines.find(([x1,y1,x2,y2]) => y1 === y2 && x1 !== x2));
+assert.notEqual(buses[0][1], buses[1][1], 'Different parent combinations need separate horizontal lanes');
+const ports = segments.map(lines => [...new Set(lines.filter(s => s[1] === 64).map(s => s[0]))]);
+assert.deepEqual(ports[0], [65, 211]);
+assert.deepEqual(ports[1], [227, 373]);
+assert(!ports[1].includes(65), 'The first parent must not connect to the second child');
+assert.match(svg.innerHTML, /stroke="var\(--paper\)" stroke-width="7"/);
+assert.equal(JSON.stringify(blended), originalData, 'Rendering must not change recorded relationships');
+console.log('Blended-family buses, separate parent ports, crossing separation, and unrelated people passed.');
