@@ -62,3 +62,22 @@ console.log('Relation network family links, extra links, filtering, selection, a
 
 const occupied=[{x:300,y:200,w:100,h:50}];
 for(let i=0;i<10;i++){const before=occupied.slice();const point=context.placeRelationLabel(350,225,90,{width:700,height:480},occupied);assert(point);const box=occupied.at(-1);assert(!before.some(b=>box.x<b.x+b.w&&box.x+box.w>b.x&&box.y<b.y+b.h&&box.y+box.h>b.y));}
+
+// Dense and disconnected casts must not overlap or pile up at viewport edges.
+for (const count of [27,60]) {
+  const cast=Array.from({length:count},(_,i)=>({id:'person'+i,name:'인물 '+i}));
+  const links=cast.slice(1,18).map((c,i)=>({from:'person'+Math.floor(i/3),to:c.id}));
+  const layout=context.relationNetworkLayout(cast,links,700,480);
+  assert.equal(layout.size,count);
+  const points=[...layout.values()];
+  for(let i=0;i<points.length;i++) for(let j=i+1;j<points.length;j++) {
+    assert(Math.abs(points[i].x-points[j].x)>=108 || Math.abs(points[i].y-points[j].y)>=50,'Cards must not overlap');
+  }
+  assert(points.some(p=>p.x>700 || p.y>480),'Large casts need room beyond the viewport');
+}
+project.characters.push({id:'alone',name:'연결 없음'});
+vm.runInContext("setRelationNetworkFilter('family',true);setRelationNetworkFilter('extra',true);setRelationNetworkFilter('person','')",context);
+assert(!svg.innerHTML.includes('data-id="alone"'));
+vm.runInContext("setRelationNetworkFilter('isolated',true)",context);
+assert(svg.innerHTML.includes('data-id="alone"'));
+console.log('Large casts, component spacing, and isolated-character visibility passed.');

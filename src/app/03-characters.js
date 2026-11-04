@@ -773,7 +773,7 @@ function saveRelationData(p, fromId, toId, type, editIndex = -1) {
 }
 
 const relationNetworkState = {
-  showFamily: true, showExtra: true, type: '', selectedId: null,
+  showFamily: true, showExtra: true, showIsolated: false, showLabels: false, type: '', selectedId: null,
   focusOnly: false, zoom: 1, panX: 0, panY: 0, layoutKey: '', layout: null,
 };
 
@@ -809,39 +809,67 @@ function relationNetworkLayout(chars, edges, width, height) {
   const positions = new Map();
   if (!chars.length) return positions;
   if (chars.length === 1) { positions.set(String(chars[0].id), { x: width / 2, y: height / 2 }); return positions; }
-  const radius = Math.min(width * .38, height * .38);
-  chars.forEach((c, i) => {
-    const angle = 2 * Math.PI * i / chars.length - Math.PI / 2;
-    positions.set(String(c.id), { x: width / 2 + radius * Math.cos(angle), y: height / 2 + radius * Math.sin(angle) });
+  const ids = chars.map(c => String(c.id));
+  const adjacent = new Map(ids.map(id => [id, new Set()]));
+  edges.forEach(e => {
+    if (!adjacent.has(e.from) || !adjacent.has(e.to)) return;
+    adjacent.get(e.from).add(e.to); adjacent.get(e.to).add(e.from);
   });
-  if (chars.length < 3) return positions;
-  const minDistance = width < 520 ? 100 : 130;
-  const desired = Math.min(185, Math.max(125, Math.sqrt(width * height / chars.length) * .8));
-  for (let step = 0; step < 100; step++) {
-    const forces = new Map(chars.map(c => [String(c.id), { x: 0, y: 0 }]));
-    for (let i = 0; i < chars.length; i++) for (let j = i + 1; j < chars.length; j++) {
-      const a = String(chars[i].id), b = String(chars[j].id);
-      const pa = positions.get(a), pb = positions.get(b);
-      const dx = pa.x - pb.x || .01, dy = pa.y - pb.y || .01;
-      const dist = Math.max(1, Math.hypot(dx, dy));
-      const strength = Math.min(14, (minDistance * minDistance * 1.8) / (dist * dist));
-      forces.get(a).x += dx / dist * strength; forces.get(a).y += dy / dist * strength;
-      forces.get(b).x -= dx / dist * strength; forces.get(b).y -= dy / dist * strength;
+  const seen = new Set(), components = [];
+  ids.forEach(id => {
+    if (seen.has(id)) return;
+    const group = [], queue = [id]; seen.add(id);
+    for (let i=0; i<queue.length; i++) {
+      const current = queue[i]; group.push(current);
+      adjacent.get(current).forEach(next => { if (!seen.has(next)) { seen.add(next); queue.push(next); } });
     }
-    edges.forEach(e => {
-      const a = positions.get(e.from), b = positions.get(e.to);
-      if (!a || !b) return;
-      const dx = b.x - a.x, dy = b.y - a.y, dist = Math.max(1, Math.hypot(dx, dy));
-      const strength = Math.max(-5, Math.min(5, (dist - desired) * .035));
-      forces.get(e.from).x += dx / dist * strength; forces.get(e.from).y += dy / dist * strength;
-      forces.get(e.to).x -= dx / dist * strength; forces.get(e.to).y -= dy / dist * strength;
+    components.push(group);
+  });
+  components.sort((a,b) => b.length - a.length);
+  const boxes = components.map(group => {
+    const local = new Map();
+    const radius = Math.max(100, Math.sqrt(group.length) * 65);
+    group.forEach((id,i) => {
+      const angle = i * Math.PI * 2 / group.length;
+      local.set(id, {x: radius*Math.cos(angle), y: radius*Math.sin(angle)});
     });
-    chars.forEach(c => {
-      const id = String(c.id), pos = positions.get(id), force = forces.get(id);
-      pos.x = Math.max(65, Math.min(width - 65, pos.x + force.x + (width / 2 - pos.x) * .006));
-      pos.y = Math.max(36, Math.min(height - 36, pos.y + force.y + (height / 2 - pos.y) * .006));
+    // 화면 경계 없이 관계가 있는 인물끼리 모으고 카드 간 충돌을 해소한다.
+    for (let step=0; step<160; step++) {
+      edges.forEach(e => {
+        const p=local.get(e.from), q=local.get(e.to); if (!p || !q) return;
+        const dx=q.x-p.x, dy=q.y-p.y, dist=Math.max(1,Math.hypot(dx,dy));
+        const pull=Math.max(-4,Math.min(4,(dist-195)*.025));
+        p.x+=dx/dist*pull; p.y+=dy/dist*pull; q.x-=dx/dist*pull; q.y-=dy/dist*pull;
+      });
+      for (let i=0;i<group.length;i++) for(let j=i+1;j<group.length;j++) {
+        const p=local.get(group[i]),q=local.get(group[j]);
+        const dx=q.x-p.x,dy=q.y-p.y;
+        const overlapX=152-Math.abs(dx),overlapY=100-Math.abs(dy);
+        if(overlapX>0 && overlapY>0) {
+          if(overlapX<overlapY) {const shift=(overlapX/2+.1)*(dx<0?-1:1);p.x-=shift;q.x+=shift;}
+          else {const shift=(overlapY/2+.1)*(dy<0?-1:1);p.y-=shift;q.y+=shift;}
+        }
+      }
+    }
+    // 남은 겹침은 빈 행으로 옮겨 카드 사이 간격을 확보한다.
+    const placed=[];
+    group.forEach(id => {
+      const p=local.get(id);
+      while(placed.some(q=>Math.abs(p.x-q.x)<140 && Math.abs(p.y-q.y)<84)) p.y+=84;
+      placed.push(p);
     });
-  }
+    const minX=Math.min(...placed.map(p=>p.x))-74, minY=Math.min(...placed.map(p=>p.y))-50;
+    const w=Math.max(...placed.map(p=>p.x))+74-minX, h=Math.max(...placed.map(p=>p.y))+50-minY;
+    return {group,local,minX,minY,w,h};
+  });
+  const targetWidth=Math.max(width,Math.sqrt(boxes.reduce((sum,b)=>sum+b.w*b.h,0)*1.7));
+  let x=24,y=24,rowHeight=0;
+  boxes.forEach(box=>{
+    if(x>24 && x+box.w>targetWidth){x=24;y+=rowHeight+64;rowHeight=0;}
+    box.group.forEach(id=>{const p=box.local.get(id);positions.set(id,{x:x+p.x-box.minX,y:y+p.y-box.minY});});
+    x+=box.w+64;rowHeight=Math.max(rowHeight,box.h);
+  });
+
   return positions;
 }
 
@@ -851,6 +879,8 @@ function setRelationNetworkFilter(name, value) {
   else if (name === 'focus') relationNetworkState.focusOnly = value;
   else if (name === 'person') relationNetworkState.selectedId = value || null;
   else if (name === 'extra') relationNetworkState.showExtra = value;
+  else if (name === 'isolated') relationNetworkState.showIsolated = value;
+  else if (name === 'labels') relationNetworkState.showLabels = value;
   drawRelationNetwork();
 }
 
@@ -908,6 +938,9 @@ function drawRelationNetwork() {
     const ids = new Set([relationNetworkState.selectedId, ...edges.flatMap(e => [e.from, e.to])]);
     chars = chars.filter(c => ids.has(String(c.id)));
   }
+  const connectedIds = new Set(edges.flatMap(e => [e.from,e.to]));
+  const isolatedCount = chars.filter(c => !connectedIds.has(String(c.id))).length;
+  if (!relationNetworkState.showIsolated && edges.length) chars = chars.filter(c => connectedIds.has(String(c.id)) || String(c.id) === relationNetworkState.selectedId);
   const width = Math.max(280, svg.clientWidth || 800), height = Math.max(360, svg.clientHeight || 480);
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   if (!chars.length) {
@@ -922,6 +955,10 @@ function drawRelationNetwork() {
   }
   const positions = relationNetworkState.layout;
   const selected = relationNetworkState.selectedId;
+  const points = [...positions.values()];
+  const bounds = {width: Math.max(width, ...points.map(p=>p.x+80)), height: Math.max(height,...points.map(p=>p.y+55))};
+  const fit = Math.min(1,width/bounds.width,height/bounds.height);
+  const scale = fit * relationNetworkState.zoom;
   const occupied = [...positions.values()].map(p => ({x:p.x-58,y:p.y-29,w:116,h:58}));
   const pairCounts = new Map();
   const paths = edges.map(e => {
@@ -940,7 +977,7 @@ function drawRelationNetwork() {
     const color = e.group === 'family' ? 'var(--gold)' : 'var(--teal)';
     const shortLabel = e.type.length > 16 ? e.type.slice(0, 15) + '…' : e.type;
     const labelWidth = Math.max(44, shortLabel.length * 12 + 14);
-    const label = active ? placeRelationLabel(midX, midY, labelWidth, {width,height}, occupied) : null;
+    const label = active && (selected || relationNetworkState.showLabels || chars.length <= 12) ? placeRelationLabel(midX, midY, labelWidth, bounds, occupied) : null;
     const labelMarkup = label ? `<line x1="${midX}" y1="${midY}" x2="${label.x}" y2="${label.y}" stroke="var(--muted)" stroke-width="1"/><rect x="${label.x-labelWidth/2}" y="${label.y-11}" width="${labelWidth}" height="22" rx="10" class="rn-edge-label-bg"/><text x="${label.x}" y="${label.y+4}" text-anchor="middle" class="rn-edge-label">${esc(shortLabel)}</text>` : '';
 
     return `<g class="rn-edge${active ? '' : ' dim'}"><path d="M ${a.x} ${a.y} Q ${midX * 2 - (a.x + b.x) / 2} ${midY * 2 - (a.y + b.y) / 2} ${endX} ${endY}" ${e.directed ? 'marker-end="url(#rn-arrow)"' : ''} fill="none" stroke="${color}" stroke-width="${active ? 2.4 : 1.4}" ${e.group === 'extra' ? 'stroke-dasharray="6 4"' : ''}/>${labelMarkup}<title>${esc(e.type)}</title></g>`;
@@ -951,10 +988,10 @@ function drawRelationNetwork() {
     const description = [c.lineageStatus, c.role].filter(Boolean).join(' · ');
     return `<g class="rn-node${selected === String(c.id) ? ' selected' : ''}${active ? '' : ' dim'}" data-id="${esc(c.id)}" transform="translate(${pos.x},${pos.y})" tabindex="0" role="button" aria-label="${esc(c.name)}${c.lineageStatus ? `, ${esc(c.lineageStatus)}` : ''} 관계 보기"><rect x="-54" y="-25" width="108" height="50" rx="12"/><text text-anchor="middle" y="-1" class="rn-node-name">${esc(c.name.length > 9 ? c.name.slice(0, 8) + '…' : c.name)}</text><text text-anchor="middle" y="16" class="rn-node-role">${esc(description.length > 12 ? description.slice(0, 11) + '…' : description)}</text></g>`;
   }).join('');
-  svg.innerHTML = `<defs><marker id="rn-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink)"/></marker></defs><g transform="translate(${relationNetworkState.panX},${relationNetworkState.panY}) scale(${relationNetworkState.zoom})">${paths}${nodes}</g>`;
+  svg.innerHTML = `<defs><marker id="rn-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink)"/></marker></defs><g transform="translate(${relationNetworkState.panX},${relationNetworkState.panY}) scale(${scale})">${paths}${nodes}</g>`;
   const person = chars.find(c => String(c.id) === selected);
   if (!person) {
-    detail.innerHTML = `<span>인물을 선택하면 연결 관계가 강조됩니다. 공간이 부족한 이름표는 아래 관계 목록에서 확인하세요.</span><span>${chars.length}명 · 표시된 연결 ${edges.length}개</span>`;
+    detail.innerHTML = `<span>인물을 누르면 해당 관계 이름과 목록을 볼 수 있습니다. 드래그로 이동하고 ＋로 확대하세요.</span><span>${chars.length}명 · 연결 ${edges.length}개${!relationNetworkState.showIsolated && isolatedCount ? ` · 연결 없는 인물 ${isolatedCount}명 숨김` : ''}</span>`;
   } else {
     const connected = edges.filter(e => e.from === selected || e.to === selected);
     detail.innerHTML = `<strong>${esc(person.name)}${person.lineageStatus ? ` · ${esc(person.lineageStatus)}` : ''}</strong>${connected.length ? connected.map(e => {
@@ -1030,6 +1067,8 @@ function renderRelations(preserveEdit = false) {
         <div class="rn-toolbar">
           <select aria-label="중심 인물" onchange="setRelationNetworkFilter('person',this.value)"><option value="">인물 선택</option>${relationCharacterOptions(chars, relationNetworkState.selectedId)}</select>
           <label><input type="checkbox" ${relationNetworkState.focusOnly ? 'checked' : ''} onchange="setRelationNetworkFilter('focus',this.checked)"> 선택 인물 주변만</label>
+          <label><input type="checkbox" ${relationNetworkState.showIsolated ? 'checked' : ''} onchange="setRelationNetworkFilter('isolated',this.checked)"> 연결 없는 인물</label>
+          <label><input type="checkbox" ${relationNetworkState.showLabels ? 'checked' : ''} onchange="setRelationNetworkFilter('labels',this.checked)"> 모든 관계 이름</label>
           <label><input type="checkbox" ${relationNetworkState.showFamily ? 'checked' : ''} onchange="setRelationNetworkFilter('family',this.checked)"> 가족 연결</label>
           <label><input type="checkbox" ${relationNetworkState.showExtra ? 'checked' : ''} onchange="setRelationNetworkFilter('extra',this.checked)"> 추가 관계</label>
           <select aria-label="추가 관계 유형" onchange="setRelationNetworkFilter('type',this.value)"><option value="">모든 추가 관계</option>${networkTypes.map(type => `<option value="${esc(type)}" ${relationNetworkState.type === type ? 'selected' : ''}>${esc(type)}</option>`).join('')}</select>

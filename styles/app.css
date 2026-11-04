@@ -586,7 +586,7 @@ button.stats-heatmap-day:focus-visible{outline:2px solid var(--gold);outline-off
 .rn-toolbar input{width:auto;margin:0}
 .rn-toolbar select{width:auto;max-width:180px;font-size:12px;padding:6px}
 .rn-zoom{display:flex;gap:4px;margin-left:auto}
-.rn-svg{display:block;width:100%;height:480px;background:var(--paper);touch-action:none;cursor:grab}
+.rn-svg{display:block;width:100%;height:clamp(480px,68vh,760px);background:var(--paper);touch-action:none;cursor:grab}
 .rn-svg:active{cursor:grabbing}
 .rn-edge.dim,.rn-node.dim{opacity:.18}
 .rn-edge-label-bg{fill:var(--white);stroke:var(--border);stroke-width:1}
