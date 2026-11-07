@@ -1098,3 +1098,7 @@ button.stats-heatmap-day:focus-visible{outline:2px solid var(--gold);outline-off
   .chapter-panes:has(>.second-editor-pane:not([hidden])){grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(2,minmax(0,1fr))}
   .second-editor-pane:not([hidden]){border-left:0;border-top:1px solid var(--border)}
 }
+
+#focus-ref-panel{width:min(320px,44%);flex-shrink:0;flex-direction:column;overflow:hidden;background:var(--paper);border-left:1.5px solid var(--border)}
+#focus-ref-panel[data-side="left"]{order:-1;border-left:0;border-right:1.5px solid var(--border)}
+.focus-ref-heading{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 10px;background:var(--cream);font-size:12px}

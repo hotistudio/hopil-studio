@@ -1570,6 +1570,22 @@ function toggleFocusChapterMemo() {
   if (isHidden) document.getElementById('focus-ch-memo-input')?.focus();
 }
 
+const FOCUS_REF_SIDE_KEY = 'hopil_focus_reference_side';
+
+function applyFocusReferenceSide(side) {
+  const panel = document.getElementById('focus-ref-panel');
+  const left = side === 'left';
+  panel.dataset.side = left ? 'left' : 'right';
+  document.getElementById('focus-ref-move').textContent = left ? '오른쪽으로 이동' : '왼쪽으로 이동';
+}
+
+function moveFocusReference() {
+  const panel = document.getElementById('focus-ref-panel');
+  const side = panel.dataset.side === 'left' ? 'right' : 'left';
+  applyFocusReferenceSide(side);
+  try { localStorage.setItem(FOCUS_REF_SIDE_KEY, side); } catch { /* 이번 세션에는 적용한다. */ }
+}
+
 function toggleFocusRef() {
   const panel = document.getElementById('focus-ref-panel');
   const btn = document.getElementById('focus-ref-btn');
@@ -1700,6 +1716,7 @@ function enterFocusMode() {
   if (!document.getElementById('focus-second-editor-pane')) {
     panes.insertAdjacentHTML('beforeend', renderSecondEditorPane('focus-'));
   }
+  try { applyFocusReferenceSide(localStorage.getItem(FOCUS_REF_SIDE_KEY)); } catch { /* 현재 위치를 유지한다. */ }
   refreshSecondEditor('focus-');
   overlay.classList.add('active');
   applyReaderStyle();
