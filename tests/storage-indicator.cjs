@@ -5,7 +5,7 @@ const source = fs.readFileSync('scripts/app.js', 'utf8');
 const start = source.indexOf('function getStorageUsage()');
 const end = source.indexOf('// ═════════', start);
 const records = new Map();
-const card = { dataset: {}, innerHTML: '' };
+const card = { dataset: {}, innerHTML: '', querySelector: () => null };
 let tick;
 let storageEvent;
 const storage = {

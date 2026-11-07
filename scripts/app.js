@@ -9172,13 +9172,19 @@ function renderStorageIndicator() {
   const percentage = Math.min(100, used / estimate * 100);
   const color = percentage >= 90 ? 'var(--rust)' : percentage >= 75 ? 'var(--gold)' : 'var(--teal)';
   const status = percentage >= 90 ? '예상 공간이 거의 찼습니다. 파일 백업을 권장합니다.' : '모든 작품과 이 사이트의 설정을 합산합니다.';
+  const expanded = element.querySelector('details')?.open || false;
   element.innerHTML = `
-    <div class="storage-summary"><strong>자동저장 공간</strong><span>예상 잔여 <b>${formatBytes(remaining)}</b></span></div>
-    <div class="storage-track" role="meter" aria-label="자동저장 공간 예상 사용률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage.toFixed(1)}" aria-valuetext="${formatBytes(used)} 사용, 예상 잔여 ${formatBytes(remaining)}">
-      <div style="width:${percentage.toFixed(1)}%;background:${color}"></div>
-    </div>
-    <div class="storage-summary storage-numbers"><span>${formatBytes(used)} 사용 · 약 ${percentage.toFixed(1)}%</span><span>예상 한도 5 MB</span></div>
-    <p>${status} 5 MB 기준의 추정치이며 실제 한도는 브라우저에 따라 달라집니다.</p>`;
+    <details class="storage-details" ${expanded ? 'open' : ''}>
+      <summary>
+        <span class="storage-title">자동저장 공간</span>
+        <span class="storage-track" role="meter" aria-label="자동저장 공간 예상 사용률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage.toFixed(1)}" aria-valuetext="${formatBytes(used)} 사용, 예상 잔여 ${formatBytes(remaining)}"><span style="width:${percentage.toFixed(1)}%;background:${color}"></span></span>
+        <span class="storage-remaining">예상 잔여 <b>${formatBytes(remaining)}</b></span>
+        <span class="storage-more">상세</span>
+      </summary>
+      <p>${formatBytes(used)} 사용 · 약 ${percentage.toFixed(1)}% · 예상 한도 5 MB. 모든 작품과 이 사이트의 설정을 합산하며 실제 한도는 브라우저에 따라 달라집니다.</p>
+    </details>
+    ${percentage >= 90 ? '<p class="storage-warning">'+status+'</p>' : ''}`;
+
 }
 
 setInterval(() => {
