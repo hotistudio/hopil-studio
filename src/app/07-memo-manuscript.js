@@ -1696,6 +1696,11 @@ function enterFocusMode() {
 
   // 오버레이 열기
   const overlay = document.getElementById('focus-overlay');
+  const panes = document.getElementById('focus-chapter-panes');
+  if (!document.getElementById('focus-second-editor-pane')) {
+    panes.insertAdjacentHTML('beforeend', renderSecondEditorPane('focus-'));
+  }
+  refreshSecondEditor('focus-');
   overlay.classList.add('active');
   applyReaderStyle();
   focusEditor.focus();
@@ -1740,6 +1745,7 @@ function exitFocusMode() {
     if (wc) wc.textContent = focusEditor.value.length.toLocaleString() + '자';
   }
 
+  refreshSecondEditor();
   focusChapterId = null;
 }
 

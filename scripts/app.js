@@ -3958,12 +3958,12 @@ function deleteScene(arcIdx, sceneIdx) {
 let activeChapterId = null;
 const secondEditorChapters = new WeakMap();
 
-function refreshSecondEditor() {
+function refreshSecondEditor(prefix = '') {
   const project = getProject();
-  const pane = document.getElementById('second-editor-pane');
+  const pane = document.getElementById(prefix + 'second-editor-pane');
   if (!pane || !project) return;
   const choices = project.chapters.filter(chapter => chapter.id !== activeChapterId);
-  const button = document.getElementById('second-editor-toggle');
+  const button = document.getElementById(prefix + 'second-editor-toggle');
   button.disabled = choices.length === 0;
   button.title = choices.length ? '다른 회차를 함께 열기' : '두 번째 회차를 추가하면 사용할 수 있습니다';
   const selectedId = secondEditorChapters.get(project);
@@ -3972,16 +3972,16 @@ function refreshSecondEditor() {
   button.setAttribute('aria-pressed', String(!!chapter));
   if (!chapter) { secondEditorChapters.delete(project); return; }
   secondEditorChapters.set(project, chapter.id);
-  const select = document.getElementById('second-chapter-select');
+  const select = document.getElementById(prefix + 'second-chapter-select');
   select.replaceChildren(...choices.map(item => new Option(item.title, item.id, false, item.id === chapter.id)));
-  const editor = document.getElementById('second-prose-editor');
+  const editor = document.getElementById(prefix + 'second-prose-editor');
   editor.value = chapter.content || '';
   editor.scrollTop = 0;
-  editor.oninput = event => onEditorInput(chapter.id, editor.value, event, 'second-wordcount');
-  document.getElementById('second-wordcount').textContent = editor.value.length.toLocaleString() + '자';
+  editor.oninput = event => onEditorInput(chapter.id, editor.value, event, prefix + 'second-wordcount');
+  document.getElementById(prefix + 'second-wordcount').textContent = editor.value.length.toLocaleString() + '자';
 }
 
-function toggleSecondEditor() {
+function toggleSecondEditor(prefix = '') {
   const project = getProject();
   if (secondEditorChapters.has(project)) secondEditorChapters.delete(project);
   else {
@@ -3991,14 +3991,14 @@ function toggleSecondEditor() {
     if (!other) return;
     secondEditorChapters.set(project, other.id);
   }
-  refreshSecondEditor();
+  refreshSecondEditor(prefix);
 }
 
-function selectSecondChapter(id) {
+function selectSecondChapter(id, prefix = '') {
   const project = getProject();
   const chapter = project.chapters.find(item => String(item.id) === id && item.id !== activeChapterId);
   if (chapter) secondEditorChapters.set(project, chapter.id);
-  refreshSecondEditor();
+  refreshSecondEditor(prefix);
 }
 
 
@@ -4283,14 +4283,7 @@ function renderEditorContent(ch) {
           <textarea id="prose-editor" placeholder="이야기를 시작하세요..."
             oninput="onEditorInput('${ch.id}',this.value,event)">${esc(ch.content||'')}</textarea>
         </div>
-        <section id="second-editor-pane" aria-label="제2 편집기" hidden>
-          <div class="second-editor-head"><label for="second-chapter-select">제2 편집기</label>
-            <select id="second-chapter-select" onchange="selectSecondChapter(this.value)" aria-label="제2 편집기 회차"></select>
-            <span id="second-wordcount"></span>
-            <button class="btn btn-outline btn-sm" onclick="toggleSecondEditor()" aria-label="제2 편집기 닫기">닫기</button>
-          </div>
-          <textarea id="second-prose-editor" aria-label="제2 편집기 원고" placeholder="이야기를 시작하세요..."></textarea>
-        </section>
+        ${renderSecondEditorPane()}
         </div>
       </div>
       <!-- 오른쪽: 참고 패널 -->
@@ -4335,6 +4328,17 @@ function renderEditorContent(ch) {
         </div>
       </div>
     </div>`;
+}
+
+function renderSecondEditorPane(prefix = '') {
+  return `<section id="${prefix}second-editor-pane" class="second-editor-pane" aria-label="제2 편집기" hidden>
+          <div class="second-editor-head"><label for="${prefix}second-chapter-select">제2 편집기</label>
+            <select id="${prefix}second-chapter-select" onchange="selectSecondChapter(this.value, '${prefix}')" aria-label="제2 편집기 회차"></select>
+            <span id="${prefix}second-wordcount"></span>
+            <button class="btn btn-outline btn-sm" onclick="toggleSecondEditor('${prefix}')" aria-label="제2 편집기 닫기">닫기</button>
+          </div>
+          <textarea id="${prefix}second-prose-editor" class="second-prose-editor" aria-label="제2 편집기 원고" placeholder="이야기를 시작하세요..."></textarea>
+        </section>`;
 }
 
 const SPLIT_WIDTH_KEY = 'hopil_studio_reference_width';
@@ -7902,6 +7906,11 @@ function enterFocusMode() {
 
   // 오버레이 열기
   const overlay = document.getElementById('focus-overlay');
+  const panes = document.getElementById('focus-chapter-panes');
+  if (!document.getElementById('focus-second-editor-pane')) {
+    panes.insertAdjacentHTML('beforeend', renderSecondEditorPane('focus-'));
+  }
+  refreshSecondEditor('focus-');
   overlay.classList.add('active');
   applyReaderStyle();
   focusEditor.focus();
@@ -7946,6 +7955,7 @@ function exitFocusMode() {
     if (wc) wc.textContent = focusEditor.value.length.toLocaleString() + '자';
   }
 
+  refreshSecondEditor();
   focusChapterId = null;
 }
 
