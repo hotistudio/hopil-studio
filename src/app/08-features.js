@@ -1751,6 +1751,7 @@ function renameForeshadowTagInContent(oldName, newName) {
     const after = before.replace(re, replacement);
     if (before !== after) {
       ch.content = after;
+      syncChapterEditors(p, ch.id, after);
       total += (before.length - after.length) / (oldName.length - (newName||'').length + 5); // 대략
     }
   });

@@ -1714,6 +1714,7 @@ function enterFocusMode() {
     if (ch2) {
       const diff = writtenCharDelta(ch2.content || '', focusEditor.value, event);
       ch2.content = focusEditor.value;
+      syncChapterEditors(p2, ch2.id, ch2.content);
       if (diff > 0) recordDailyWriting(diff);
       if (isWritingActivityInput(event)) onTypingKey();
       autoSave();
