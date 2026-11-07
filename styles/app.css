@@ -1086,11 +1086,15 @@ button.stats-heatmap-day:focus-visible{outline:2px solid var(--gold);outline-off
   #focus-editor-wrap{padding:14px 16px !important}
 }
 
-.chapter-panes{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden;container-type:inline-size}
+.manuscript-column{display:flex;flex:1;flex-direction:column;min-width:0;overflow:hidden;container:manuscript / inline-size}
+.chapter-panes{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
+.chapter-panes:has(>#second-editor-pane:not([hidden])){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(0,1fr)}
 .chapter-panes>.editor-content{min-width:0}
 #second-editor-pane:not([hidden]){display:flex;flex:1;min-width:0;min-height:0;flex-direction:column;border-left:1px solid var(--border);background:var(--paper)}
 .second-editor-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 10px;background:var(--cream);color:var(--muted);font-size:11px}
 .second-editor-head label{font-weight:700}.second-editor-head select{flex:1;min-width:64px;width:0}
 #second-prose-editor{flex:1;min-height:0;width:100%;padding:16px;border:0;resize:none;background:var(--paper);color:var(--ink);font:var(--editor-font-size,16px)/1.85 'Noto Serif KR',serif}
-@container (max-width:580px){.chapter-panes:has(>#second-editor-pane:not([hidden]))>.editor-content{height:50%;flex:none !important}.chapter-panes>#second-editor-pane:not([hidden]){position:absolute;inset:50% 0 0;border-left:0;border-top:1px solid var(--border)}}
-.chapter-panes{position:relative}
+@container manuscript (max-width:580px){
+  .chapter-panes:has(>#second-editor-pane:not([hidden])){grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(2,minmax(0,1fr))}
+  #second-editor-pane:not([hidden]){border-left:0;border-top:1px solid var(--border)}
+}

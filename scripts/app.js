@@ -3962,10 +3962,10 @@ function refreshSecondEditor() {
   const project = getProject();
   const pane = document.getElementById('second-editor-pane');
   if (!pane || !project) return;
-  const choices = project.chapters;
+  const choices = project.chapters.filter(chapter => chapter.id !== activeChapterId);
   const button = document.getElementById('second-editor-toggle');
   button.disabled = choices.length === 0;
-  button.title = choices.length ? '현재 회차 또는 다른 회차를 함께 열기' : '회차를 추가하면 사용할 수 있습니다';
+  button.title = choices.length ? '다른 회차를 함께 열기' : '두 번째 회차를 추가하면 사용할 수 있습니다';
   const selectedId = secondEditorChapters.get(project);
   const chapter = selectedId != null && (choices.find(item => item.id === selectedId) || choices[0]);
   pane.hidden = !chapter;
@@ -3987,7 +3987,7 @@ function toggleSecondEditor() {
   else {
     const chapters = project.chapters;
     const index = chapters.findIndex(chapter => chapter.id === activeChapterId);
-    const other = chapters[index + 1] || chapters[index - 1] || chapters[index];
+    const other = chapters[index + 1] || chapters[index - 1];
     if (!other) return;
     secondEditorChapters.set(project, other.id);
   }
@@ -3996,7 +3996,7 @@ function toggleSecondEditor() {
 
 function selectSecondChapter(id) {
   const project = getProject();
-  const chapter = project.chapters.find(item => String(item.id) === id);
+  const chapter = project.chapters.find(item => String(item.id) === id && item.id !== activeChapterId);
   if (chapter) secondEditorChapters.set(project, chapter.id);
   refreshSecondEditor();
 }
@@ -4218,7 +4218,7 @@ function renderEditorContent(ch) {
   return `
     <div style="display:flex;flex:1;overflow:hidden;">
       <!-- 왼쪽: 툴바 + 단축키 + 에디터 -->
-      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+      <div class="manuscript-column">
         <div class="editor-toolbar">
           <input id="chapter-title-input" value="${esc(ch.title)}" onchange="updateChapter('${ch.id}','title',this.value)"
             style="width:160px;font-weight:700;font-size:14px;flex-shrink:0">
@@ -4414,37 +4414,12 @@ function updateChapterMemo(chId, val) {
   window._chMemoTimer = setTimeout(autoSave, 600);
 }
 
-// 상대 창에서 바뀐 부분만 반영해 이 창의 선택 영역과 스크롤을 유지한다.
-function syncManuscriptView(editorId, countId, text) {
-  const editor = document.getElementById(editorId);
-  if (!editor || editor.value === text) return;
-  const previous = editor.value;
-  const limit = Math.min(previous.length, text.length);
-  let start = 0;
-  while (start < limit && previous[start] === text[start]) start++;
-  let suffix = 0;
-  while (suffix < limit - start && previous[previous.length - 1 - suffix] === text[text.length - 1 - suffix]) suffix++;
-  const scrollTop = editor.scrollTop;
-  const scrollLeft = editor.scrollLeft;
-  editor.setRangeText(text.slice(start, text.length - suffix), start, previous.length - suffix, 'preserve');
-  editor.scrollTop = scrollTop;
-  editor.scrollLeft = scrollLeft;
-  const count = document.getElementById(countId);
-  if (count) count.textContent = text.length.toLocaleString() + '자';
-}
-
-function syncChapterEditors(project, id, text) {
-  if (activeChapterId === id) syncManuscriptView('prose-editor', 'wc-display', text);
-  if (secondEditorChapters.get(project) === id) syncManuscriptView('second-prose-editor', 'second-wordcount', text);
-}
-
 function onEditorInput(id, val, inputEvent, countId = 'wc-display') {
   const p = getProject();
   const ch = p.chapters.find(c => c.id === id);
   if (!ch) return;
   const previous = ch.content || '';
   ch.content = val;
-  syncChapterEditors(p, id, val);
   const wc = document.getElementById(countId);
   if (wc) wc.textContent = val.length.toLocaleString() + '자';
   // 날짜별 집필량 기록
@@ -4468,6 +4443,8 @@ function updateChapterListItem(ch) {
 }
 
 function selectChapter(id) {
+  const project = getProject();
+  if (secondEditorChapters.get(project) === id) secondEditorChapters.set(project, activeChapterId);
   activeChapterId = id;
   const sp = document.getElementById('split-panel');
   const wasOpen = sp && !sp.classList.contains('hidden');
@@ -7943,7 +7920,6 @@ function enterFocusMode() {
     if (ch2) {
       const diff = writtenCharDelta(ch2.content || '', focusEditor.value, event);
       ch2.content = focusEditor.value;
-      syncChapterEditors(p2, ch2.id, ch2.content);
       if (diff > 0) recordDailyWriting(diff);
       if (isWritingActivityInput(event)) onTypingKey();
       autoSave();
@@ -10591,7 +10567,6 @@ function renameForeshadowTagInContent(oldName, newName) {
     const after = before.replace(re, replacement);
     if (before !== after) {
       ch.content = after;
-      syncChapterEditors(p, ch.id, after);
       total += (before.length - after.length) / (oldName.length - (newName||'').length + 5); // 대략
     }
   });
