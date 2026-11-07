@@ -51,7 +51,7 @@ function renderHome() {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
           <div style="font-size:13px;color:var(--muted)">${projects.length}개의 작품</div>
-          <div id="storage-indicator" style="display:flex;align-items:center;gap:8px"></div>
+
 
         </div>
         <div style="display:flex;gap:10px">
@@ -70,6 +70,7 @@ function renderHome() {
           </button>
         </div>
       </div>
+      <section id="storage-indicator" class="storage-card" aria-label="자동저장 공간"></section>
       ${cards}
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">

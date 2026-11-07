@@ -1102,3 +1102,10 @@ button.stats-heatmap-day:focus-visible{outline:2px solid var(--gold);outline-off
 #focus-ref-panel{width:min(320px,44%);flex-shrink:0;flex-direction:column;overflow:hidden;background:var(--paper);border-left:1.5px solid var(--border)}
 #focus-ref-panel[data-side="left"]{order:-1;border-left:0;border-right:1.5px solid var(--border)}
 .focus-ref-heading{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 10px;background:var(--cream);font-size:12px}
+
+.storage-card{padding:16px 18px;margin-bottom:20px;border:1px solid var(--border);border-radius:12px;background:var(--white)}
+.storage-summary{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 16px;font-size:13px}
+.storage-track{height:12px;margin:12px 0 8px;background:var(--border);border-radius:8px;overflow:hidden}
+.storage-track>div{height:100%;border-radius:8px;transition:width .3s}
+.storage-numbers{font-size:12px;color:var(--muted)}
+.storage-card p{font-size:11px;line-height:1.6;color:var(--muted);margin:8px 0 0}

@@ -1703,7 +1703,7 @@ function renderHome() {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
           <div style="font-size:13px;color:var(--muted)">${projects.length}개의 작품</div>
-          <div id="storage-indicator" style="display:flex;align-items:center;gap:8px"></div>
+
 
         </div>
         <div style="display:flex;gap:10px">
@@ -1722,6 +1722,7 @@ function renderHome() {
           </button>
         </div>
       </div>
+      <section id="storage-indicator" class="storage-card" aria-label="자동저장 공간"></section>
       ${cards}
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
@@ -9137,13 +9138,15 @@ function toggleDarkMode() {
 // ═══════════════════════════════════════════════════════════
 function getStorageUsage() {
   try {
-    let total = 0;
-    for (let key in localStorage) {
-      if (!localStorage.hasOwnProperty(key)) continue;
-      total += (localStorage[key].length + key.length) * 2; // UTF-16 기준
+    let bytes = 0;
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index);
+      if (key === null) continue;
+      const value = localStorage.getItem(key);
+      if (value !== null) bytes += (key.length + value.length) * 2;
     }
-    return total;
-  } catch { return 0; }
+    return bytes;
+  } catch { return null; }
 }
 
 function formatBytes(bytes) {
@@ -9153,26 +9156,35 @@ function formatBytes(bytes) {
 }
 
 function renderStorageIndicator() {
-  const el = document.getElementById('storage-indicator');
-  if (!el) return;
-
+  const element = document.getElementById('storage-indicator');
+  if (!element) return;
   const used = getStorageUsage();
-  const limit = 10 * 1024 * 1024; // 10MB 기준 (Chrome Android)
-  const pct = Math.min(100, (used / limit * 100));
-  const color = pct > 80 ? 'var(--rust)' : pct > 60 ? 'var(--gold)' : 'var(--teal)';
-
-  el.innerHTML = `
-    <div style="display:flex;align-items:center;gap:6px">
-      <div style="width:80px;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
-        <div style="width:${pct.toFixed(1)}%;height:100%;background:${color};border-radius:3px;transition:width .5s"></div>
-      </div>
-      <span style="font-size:11px;color:var(--muted)">${formatBytes(used)} / 10MB</span>
-      ${pct > 80 ? '<span style="font-size:11px;color:var(--rust);font-weight:700">⚠️ 용량 부족</span>' : ''}
+  const signature = String(used);
+  if (element.dataset.usage === signature) return;
+  element.dataset.usage = signature;
+  if (used === null) {
+    element.innerHTML = '<strong>자동저장 공간</strong><p>브라우저 저장공간에 접근할 수 없어 용량을 확인하지 못했습니다.</p>';
+    return;
+  }
+  // localStorage의 일반적인 권장 한도를 사용하며 실제 할당량으로 단정하지 않는다.
+  const estimate = 5 * 1024 * 1024;
+  const remaining = Math.max(0, estimate - used);
+  const percentage = Math.min(100, used / estimate * 100);
+  const color = percentage >= 90 ? 'var(--rust)' : percentage >= 75 ? 'var(--gold)' : 'var(--teal)';
+  const status = percentage >= 90 ? '예상 공간이 거의 찼습니다. 파일 백업을 권장합니다.' : '모든 작품과 이 사이트의 설정을 합산합니다.';
+  element.innerHTML = `
+    <div class="storage-summary"><strong>자동저장 공간</strong><span>예상 잔여 <b>${formatBytes(remaining)}</b></span></div>
+    <div class="storage-track" role="meter" aria-label="자동저장 공간 예상 사용률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage.toFixed(1)}" aria-valuetext="${formatBytes(used)} 사용, 예상 잔여 ${formatBytes(remaining)}">
+      <div style="width:${percentage.toFixed(1)}%;background:${color}"></div>
     </div>
-
-  `;
+    <div class="storage-summary storage-numbers"><span>${formatBytes(used)} 사용 · 약 ${percentage.toFixed(1)}%</span><span>예상 한도 5 MB</span></div>
+    <p>${status} 5 MB 기준의 추정치이며 실제 한도는 브라우저에 따라 달라집니다.</p>`;
 }
 
+setInterval(() => {
+  if (!document.hidden && document.getElementById('storage-indicator')) renderStorageIndicator();
+}, 1000);
+window.addEventListener('storage', renderStorageIndicator);
 
 // ═══════════════════════════════════════════════════════════
 // 집필기 폰트 크기 조절
