@@ -17,7 +17,7 @@ function toggleTypewriterScrolling() {
   try { localStorage.setItem(TYPEWRITER_SCROLL_KEY, String(typewriterScrolling)); } catch (_) {}
   updateTypewriterButtons();
   if (typewriterScrolling) {
-    const editor = document.activeElement?.matches?.('#prose-editor, #focus-editor')
+    const editor = typeof getActiveManuscriptEditor === 'function' ? getActiveManuscriptEditor() : document.activeElement?.matches?.('#prose-editor, #focus-editor, #second-prose-editor, #focus-second-prose-editor')
       ? document.activeElement
       : document.querySelector('#focus-overlay.active #focus-editor') || document.getElementById('prose-editor');
     if (editor) requestAnimationFrame(() => scrollTypewriterCaret(editor));
@@ -97,19 +97,19 @@ function queueTypewriterScroll(editor) {
 
 document.addEventListener('input', event => {
   if (event.isComposing) return;
-  if (event.target?.matches?.('#prose-editor, #focus-editor')) queueTypewriterScroll(event.target);
+  if (event.target?.matches?.('#prose-editor, #focus-editor, #second-prose-editor, #focus-second-prose-editor')) queueTypewriterScroll(event.target);
 }, true);
 document.addEventListener('compositionend', event => {
-  if (event.target?.matches?.('#prose-editor, #focus-editor')) queueTypewriterScroll(event.target);
+  if (event.target?.matches?.('#prose-editor, #focus-editor, #second-prose-editor, #focus-second-prose-editor')) queueTypewriterScroll(event.target);
 }, true);
 document.addEventListener('keyup', event => {
   if (/^(ArrowUp|ArrowDown|PageUp|PageDown|Home|End)$/.test(event.key)
-      && event.target?.matches?.('#prose-editor, #focus-editor')) {
+      && event.target?.matches?.('#prose-editor, #focus-editor, #second-prose-editor, #focus-second-prose-editor')) {
     queueTypewriterScroll(event.target);
   }
 }, true);
 document.addEventListener('focusin', event => {
-  if (event.target?.matches?.('#prose-editor, #focus-editor')) queueTypewriterScroll(event.target);
+  if (!event.target?._restoringView && event.target?.matches?.('#prose-editor, #focus-editor, #second-prose-editor, #focus-second-prose-editor')) queueTypewriterScroll(event.target);
 }, true);
 
 updateTypewriterButtons();

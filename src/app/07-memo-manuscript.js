@@ -1635,6 +1635,7 @@ function focusRefTab(tab) {
 }
 
 function enterFocusMode() {
+  rememberManuscriptViews();
   const ta = document.getElementById('prose-editor');
   if (!ta) { toast('집필기에서만 사용할 수 있어요.'); return; }
 
@@ -1688,24 +1689,7 @@ function enterFocusMode() {
       btn.style.cssText = 'font-size:13px;min-width:32px;height:32px;padding:0 6px';
       btn.title = `^${k}`;
       btn.textContent = sym;
-      btn.onclick = () => {
-        const fe = document.getElementById('focus-editor');
-        if (!fe) return;
-        const s = fe.selectionStart, e = fe.selectionEnd;
-        const selected = fe.value.slice(s, e);
-        const isPair = sym.length === 2;
-        if (isPair) {
-          const inner = selected || '';
-          fe.value = fe.value.slice(0,s) + sym[0] + inner + sym[1] + fe.value.slice(e);
-          fe.selectionStart = fe.selectionEnd = inner ? s+1 : s+1;
-          if (inner) { fe.selectionStart = s+1; fe.selectionEnd = s+1+inner.length; }
-        } else {
-          fe.value = fe.value.slice(0,s) + sym + fe.value.slice(e);
-          fe.selectionStart = fe.selectionEnd = s + sym.length;
-        }
-        fe.focus();
-        fe.dispatchEvent(new Event('input', {bubbles:true}));
-      };
+      btn.onclick = () => insertSymbol(sym);
       focusShortcutBar.appendChild(btn);
     });
   }
@@ -1717,10 +1701,11 @@ function enterFocusMode() {
     panes.insertAdjacentHTML('beforeend', renderSecondEditorPane('focus-'));
   }
   try { applyFocusReferenceSide(localStorage.getItem(FOCUS_REF_SIDE_KEY)); } catch { /* 현재 위치를 유지한다. */ }
-  refreshSecondEditor('focus-');
   overlay.classList.add('active');
+  refreshSecondEditor('focus-', false);
   applyReaderStyle();
-  focusEditor.focus();
+  focusEditor.focus({preventScroll:true});
+  bindManuscriptEditor(focusEditor, ch);
 
   // 전체화면 요청
   if (document.documentElement.requestFullscreen) {
@@ -1744,6 +1729,7 @@ function enterFocusMode() {
 }
 
 function exitFocusMode() {
+  rememberManuscriptViews();
   const overlay = document.getElementById('focus-overlay');
   overlay.classList.remove('active');
 
@@ -1762,7 +1748,8 @@ function exitFocusMode() {
     if (wc) wc.textContent = focusEditor.value.length.toLocaleString() + '자';
   }
 
-  refreshSecondEditor();
+  bindManuscriptEditor(mainEditor, getProject()?.chapters.find(ch => ch.id === focusChapterId));
+  refreshSecondEditor('', false);
   focusChapterId = null;
 }
 

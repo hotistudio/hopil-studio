@@ -3959,8 +3959,60 @@ function deleteScene(arcIdx, sceneIdx) {
 let activeChapterId = null;
 const secondEditorChapters = new WeakMap();
 
-function refreshSecondEditor(prefix = '') {
+// View state belongs to the chapter object, independently of pane and project IDs.
+const manuscriptViews = new WeakMap();
+const manuscriptSelector = '#prose-editor, #focus-editor, #second-prose-editor, #focus-second-prose-editor';
+let lastManuscriptEditor = null;
+function isManuscriptEditor(editor) { return !!editor?.matches?.(manuscriptSelector); }
+function visibleManuscriptEditor(editor) {
+  if (!editor?.isConnected || !isManuscriptEditor(editor)) return false;
+  const focused = !!document.getElementById('focus-overlay')?.classList.contains('active');
+  return editor.id.startsWith('focus-') === focused && !editor.closest('[hidden]');
+}
+function getActiveManuscriptEditor() {
+  if (visibleManuscriptEditor(document.activeElement)) return document.activeElement;
+  if (visibleManuscriptEditor(lastManuscriptEditor)) return lastManuscriptEditor;
+  return document.getElementById(document.getElementById('focus-overlay')?.classList.contains('active') ? 'focus-editor' : 'prose-editor');
+}
+function rememberManuscriptView(editor) {
+  if (!editor?._manuscriptChapter || editor._restoringView || !visibleManuscriptEditor(editor)) return;
+  manuscriptViews.set(editor._manuscriptChapter, {
+    start: editor.selectionStart, end: editor.selectionEnd, direction: editor.selectionDirection,
+    top: editor.scrollTop, left: editor.scrollLeft
+  });
+}
+function rememberManuscriptViews() {
+  document.querySelectorAll(manuscriptSelector).forEach(rememberManuscriptView);
+}
+function bindManuscriptEditor(editor, chapter) {
+  if (!editor || !chapter) return;
+  editor._manuscriptChapter = chapter;
+  const view = manuscriptViews.get(chapter) || {start:0,end:0,direction:'none',top:0,left:0};
+  const token = {};
+  editor._restoringView = token;
+  const restore = () => {
+    if (!editor.isConnected || editor._restoringView !== token) return;
+    editor.setSelectionRange(view.start, view.end, view.direction);
+    editor.scrollTop = view.top;
+    editor.scrollLeft = view.left;
+  };
+  restore();
+  requestAnimationFrame(() => { restore(); if (editor._restoringView === token) editor._restoringView = null; });
+}
+document.addEventListener('focusin', event => {
+  if (!isManuscriptEditor(event.target)) return;
+  if (lastManuscriptEditor !== event.target && typeof frClear === 'function') frClear();
+  lastManuscriptEditor = event.target;
+});
+for (const name of ['scroll', 'select', 'keyup', 'pointerup', 'focusout', 'input']) {
+  document.addEventListener(name, event => {
+    if (isManuscriptEditor(event.target)) rememberManuscriptView(event.target);
+  }, true);
+}
+
+function refreshSecondEditor(prefix = '', remember = true) {
   const project = getProject();
+  if (remember) rememberManuscriptView(document.getElementById(prefix + 'second-prose-editor'));
   const pane = document.getElementById(prefix + 'second-editor-pane');
   if (!pane || !project) return;
   const choices = project.chapters.filter(chapter => chapter.id !== activeChapterId);
@@ -3977,7 +4029,7 @@ function refreshSecondEditor(prefix = '') {
   select.replaceChildren(...choices.map(item => new Option(item.title, item.id, false, item.id === chapter.id)));
   const editor = document.getElementById(prefix + 'second-prose-editor');
   editor.value = chapter.content || '';
-  editor.scrollTop = 0;
+  bindManuscriptEditor(editor, chapter);
   editor.oninput = event => onEditorInput(chapter.id, editor.value, event, prefix + 'second-wordcount');
   document.getElementById(prefix + 'second-wordcount').textContent = editor.value.length.toLocaleString() + '자';
 }
@@ -4004,6 +4056,7 @@ function selectSecondChapter(id, prefix = '') {
 
 
 function renderChapters() {
+  rememberManuscriptViews();
   const p = getProject();
   const chapters = p.chapters || [];
   const folders = p.chapterFolders || [];
@@ -4169,7 +4222,8 @@ function renderChapters() {
           </div>`}
       </div>
     </div>`;
-  refreshSecondEditor();
+  bindManuscriptEditor(document.getElementById('prose-editor'), ch);
+  refreshSecondEditor('', false);
   applyChapterListCollapsed();
   setTimeout(() => {
     refreshShortcutBar(); applyEditorFontSize(); applyReaderStyle(); initChDrag(); initAllDragScrolls(); initSplitPanelResize();
@@ -7846,6 +7900,7 @@ function focusRefTab(tab) {
 }
 
 function enterFocusMode() {
+  rememberManuscriptViews();
   const ta = document.getElementById('prose-editor');
   if (!ta) { toast('집필기에서만 사용할 수 있어요.'); return; }
 
@@ -7899,24 +7954,7 @@ function enterFocusMode() {
       btn.style.cssText = 'font-size:13px;min-width:32px;height:32px;padding:0 6px';
       btn.title = `^${k}`;
       btn.textContent = sym;
-      btn.onclick = () => {
-        const fe = document.getElementById('focus-editor');
-        if (!fe) return;
-        const s = fe.selectionStart, e = fe.selectionEnd;
-        const selected = fe.value.slice(s, e);
-        const isPair = sym.length === 2;
-        if (isPair) {
-          const inner = selected || '';
-          fe.value = fe.value.slice(0,s) + sym[0] + inner + sym[1] + fe.value.slice(e);
-          fe.selectionStart = fe.selectionEnd = inner ? s+1 : s+1;
-          if (inner) { fe.selectionStart = s+1; fe.selectionEnd = s+1+inner.length; }
-        } else {
-          fe.value = fe.value.slice(0,s) + sym + fe.value.slice(e);
-          fe.selectionStart = fe.selectionEnd = s + sym.length;
-        }
-        fe.focus();
-        fe.dispatchEvent(new Event('input', {bubbles:true}));
-      };
+      btn.onclick = () => insertSymbol(sym);
       focusShortcutBar.appendChild(btn);
     });
   }
@@ -7928,10 +7966,11 @@ function enterFocusMode() {
     panes.insertAdjacentHTML('beforeend', renderSecondEditorPane('focus-'));
   }
   try { applyFocusReferenceSide(localStorage.getItem(FOCUS_REF_SIDE_KEY)); } catch { /* 현재 위치를 유지한다. */ }
-  refreshSecondEditor('focus-');
   overlay.classList.add('active');
+  refreshSecondEditor('focus-', false);
   applyReaderStyle();
-  focusEditor.focus();
+  focusEditor.focus({preventScroll:true});
+  bindManuscriptEditor(focusEditor, ch);
 
   // 전체화면 요청
   if (document.documentElement.requestFullscreen) {
@@ -7955,6 +7994,7 @@ function enterFocusMode() {
 }
 
 function exitFocusMode() {
+  rememberManuscriptViews();
   const overlay = document.getElementById('focus-overlay');
   overlay.classList.remove('active');
 
@@ -7973,7 +8013,8 @@ function exitFocusMode() {
     if (wc) wc.textContent = focusEditor.value.length.toLocaleString() + '자';
   }
 
-  refreshSecondEditor();
+  bindManuscriptEditor(mainEditor, getProject()?.chapters.find(ch => ch.id === focusChapterId));
+  refreshSecondEditor('', false);
   focusChapterId = null;
 }
 
@@ -11712,7 +11753,7 @@ function closeFindReplace() {
 }
 
 function frGetEditor() {
-  return document.getElementById('prose-editor') || document.getElementById('focus-editor');
+  return getActiveManuscriptEditor();
 }
 
 function frHighlight(scrollToFirst = true) {

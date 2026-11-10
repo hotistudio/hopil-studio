@@ -2868,7 +2868,7 @@ function closeFindReplace() {
 }
 
 function frGetEditor() {
-  return document.getElementById('prose-editor') || document.getElementById('focus-editor');
+  return getActiveManuscriptEditor();
 }
 
 function frHighlight(scrollToFirst = true) {

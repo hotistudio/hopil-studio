@@ -42,13 +42,12 @@
   const _customStacks = new Map(); // chapterId → snapshot[]
   const _customRedo   = new Map(); // chapterId → snapshot[]
 
-  function currentChapterId() {
-    // activeChapterId 전역, focus 모드도 동일 ID 사용
-    return (typeof activeChapterId !== 'undefined') ? activeChapterId : null;
+  function currentChapterId(el) {
+    return el?._manuscriptChapter || null;
   }
 
   function pushCustomSnapshot(el) {
-    const cid = currentChapterId();
+    const cid = currentChapterId(el);
     if (!cid) return;
     const stack = _customStacks.get(cid) || [];
     const last  = stack[stack.length - 1];
@@ -66,15 +65,15 @@
     _customRedo.set(cid, []);
   }
 
-  function popCustomSnapshot() {
-    const cid = currentChapterId();
+  function popCustomSnapshot(el) {
+    const cid = currentChapterId(el);
     if (!cid) return null;
     const stack = _customStacks.get(cid) || [];
     return stack.pop() || null;
   }
 
-  function peekCustomSnapshot() {
-    const cid = currentChapterId();
+  function peekCustomSnapshot(el) {
+    const cid = currentChapterId(el);
     if (!cid) return null;
     const stack = _customStacks.get(cid) || [];
     return stack[stack.length - 1] || null;
@@ -83,27 +82,26 @@
   // ─── idle 스냅샷: 타이핑 300ms 멈추면 1회 기록 ───────────────────
   // 과도하게 쌓이지 않게 내용 변동 임계치도 체크.
   let _idleTimer = null;
-  let _lastSnapshotContent = '';
+
 
   function scheduleIdleSnapshot(el) {
+    const chapter = currentChapterId(el);
     clearTimeout(_idleTimer);
     _idleTimer = setTimeout(() => {
-      if (!el || !document.body.contains(el)) return;
+      if (!el || !document.body.contains(el) || currentChapterId(el) !== chapter) return;
       // 직전 스냅샷과 같으면 무시
-      const last = peekCustomSnapshot();
+      const last = peekCustomSnapshot(el);
       if (last && last.content === el.value) return;
       // 최소 변동: 5자 이상 차이 날 때만
-      if (_lastSnapshotContent &&
-          Math.abs(el.value.length - _lastSnapshotContent.length) < 5) return;
+      if (last && Math.abs(el.value.length - last.content.length) < 5) return;
       pushCustomSnapshot(el);
-      _lastSnapshotContent = el.value;
     }, 300);
   }
 
   // ─── 기존 insertSymbol 덮어쓰기 ─────────────────────────────────
   const _origInsertSymbol = window.insertSymbol;
   window.insertSymbol = function (sym) {
-    const ta = document.getElementById('prose-editor');
+    const ta = getActiveManuscriptEditor();
     if (!ta) return;
     const s = ta.selectionStart, e = ta.selectionEnd;
     const selected = ta.value.slice(s, e);
@@ -133,10 +131,8 @@
     const sym = SHORTCUT_SYMBOLS[e.key];
     if (!sym) return;
 
-    const ta = document.getElementById('prose-editor');
-    const fe = document.getElementById('focus-editor');
     const active = document.activeElement;
-    if (active !== ta && active !== fe) return;
+    if (!isManuscriptEditor(active)) return;
 
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -218,26 +214,26 @@
     if (!isUndo && !isRedo) return;
 
     const active = document.activeElement;
-    const ta = document.getElementById('prose-editor');
-    const fe = document.getElementById('focus-editor');
-    if (active !== ta && active !== fe) return;
+    if (!isManuscriptEditor(active)) return;
 
     const target = active;
+    const chapter = currentChapterId(target);
     const before = target.value;
     const beforeSel = [target.selectionStart, target.selectionEnd];
 
     // 브라우저 native 에 먼저 기회를 준다 — 다음 tick 에 확인
     setTimeout(() => {
+      if (!target.isConnected || currentChapterId(target) !== chapter) return;
       if (target.value !== before) {
         // native 가 뭔가 되돌렸음. OK.
         return;
       }
       // native 가 아무것도 못 함 → 커스텀 스택 사용
       if (isUndo) {
-        const snap = popCustomSnapshot();
+        const snap = popCustomSnapshot(target);
         if (!snap) return;
         // 현재 상태는 redo 용으로 보존
-        const cid = currentChapterId();
+        const cid = currentChapterId(target);
         if (cid) {
           const redoStack = _customRedo.get(cid) || [];
           redoStack.push({
@@ -255,7 +251,7 @@
         target.dispatchEvent(new Event('input', { bubbles: true }));
         if (typeof toast === 'function') toast('되돌렸어요 (1단계)');
       } else if (isRedo) {
-        const cid = currentChapterId();
+        const cid = currentChapterId(target);
         if (!cid) return;
         const redoStack = _customRedo.get(cid) || [];
         const snap = redoStack.pop();
@@ -274,7 +270,7 @@
   // 기존 oninput 을 건드리지 않고 capture 리스너로 추가.
   document.addEventListener('input', (e) => {
     const t = e.target;
-    if (t && (t.id === 'prose-editor' || t.id === 'focus-editor')) {
+    if (isManuscriptEditor(t)) {
       scheduleIdleSnapshot(t);
     }
   }, true);

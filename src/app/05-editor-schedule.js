@@ -3,8 +3,60 @@
 let activeChapterId = null;
 const secondEditorChapters = new WeakMap();
 
-function refreshSecondEditor(prefix = '') {
+// View state belongs to the chapter object, independently of pane and project IDs.
+const manuscriptViews = new WeakMap();
+const manuscriptSelector = '#prose-editor, #focus-editor, #second-prose-editor, #focus-second-prose-editor';
+let lastManuscriptEditor = null;
+function isManuscriptEditor(editor) { return !!editor?.matches?.(manuscriptSelector); }
+function visibleManuscriptEditor(editor) {
+  if (!editor?.isConnected || !isManuscriptEditor(editor)) return false;
+  const focused = !!document.getElementById('focus-overlay')?.classList.contains('active');
+  return editor.id.startsWith('focus-') === focused && !editor.closest('[hidden]');
+}
+function getActiveManuscriptEditor() {
+  if (visibleManuscriptEditor(document.activeElement)) return document.activeElement;
+  if (visibleManuscriptEditor(lastManuscriptEditor)) return lastManuscriptEditor;
+  return document.getElementById(document.getElementById('focus-overlay')?.classList.contains('active') ? 'focus-editor' : 'prose-editor');
+}
+function rememberManuscriptView(editor) {
+  if (!editor?._manuscriptChapter || editor._restoringView || !visibleManuscriptEditor(editor)) return;
+  manuscriptViews.set(editor._manuscriptChapter, {
+    start: editor.selectionStart, end: editor.selectionEnd, direction: editor.selectionDirection,
+    top: editor.scrollTop, left: editor.scrollLeft
+  });
+}
+function rememberManuscriptViews() {
+  document.querySelectorAll(manuscriptSelector).forEach(rememberManuscriptView);
+}
+function bindManuscriptEditor(editor, chapter) {
+  if (!editor || !chapter) return;
+  editor._manuscriptChapter = chapter;
+  const view = manuscriptViews.get(chapter) || {start:0,end:0,direction:'none',top:0,left:0};
+  const token = {};
+  editor._restoringView = token;
+  const restore = () => {
+    if (!editor.isConnected || editor._restoringView !== token) return;
+    editor.setSelectionRange(view.start, view.end, view.direction);
+    editor.scrollTop = view.top;
+    editor.scrollLeft = view.left;
+  };
+  restore();
+  requestAnimationFrame(() => { restore(); if (editor._restoringView === token) editor._restoringView = null; });
+}
+document.addEventListener('focusin', event => {
+  if (!isManuscriptEditor(event.target)) return;
+  if (lastManuscriptEditor !== event.target && typeof frClear === 'function') frClear();
+  lastManuscriptEditor = event.target;
+});
+for (const name of ['scroll', 'select', 'keyup', 'pointerup', 'focusout', 'input']) {
+  document.addEventListener(name, event => {
+    if (isManuscriptEditor(event.target)) rememberManuscriptView(event.target);
+  }, true);
+}
+
+function refreshSecondEditor(prefix = '', remember = true) {
   const project = getProject();
+  if (remember) rememberManuscriptView(document.getElementById(prefix + 'second-prose-editor'));
   const pane = document.getElementById(prefix + 'second-editor-pane');
   if (!pane || !project) return;
   const choices = project.chapters.filter(chapter => chapter.id !== activeChapterId);
@@ -21,7 +73,7 @@ function refreshSecondEditor(prefix = '') {
   select.replaceChildren(...choices.map(item => new Option(item.title, item.id, false, item.id === chapter.id)));
   const editor = document.getElementById(prefix + 'second-prose-editor');
   editor.value = chapter.content || '';
-  editor.scrollTop = 0;
+  bindManuscriptEditor(editor, chapter);
   editor.oninput = event => onEditorInput(chapter.id, editor.value, event, prefix + 'second-wordcount');
   document.getElementById(prefix + 'second-wordcount').textContent = editor.value.length.toLocaleString() + '자';
 }
@@ -48,6 +100,7 @@ function selectSecondChapter(id, prefix = '') {
 
 
 function renderChapters() {
+  rememberManuscriptViews();
   const p = getProject();
   const chapters = p.chapters || [];
   const folders = p.chapterFolders || [];
@@ -213,7 +266,8 @@ function renderChapters() {
           </div>`}
       </div>
     </div>`;
-  refreshSecondEditor();
+  bindManuscriptEditor(document.getElementById('prose-editor'), ch);
+  refreshSecondEditor('', false);
   applyChapterListCollapsed();
   setTimeout(() => {
     refreshShortcutBar(); applyEditorFontSize(); applyReaderStyle(); initChDrag(); initAllDragScrolls(); initSplitPanelResize();
