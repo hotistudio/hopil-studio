@@ -1186,6 +1186,7 @@ async function exportAllProjects() {
   const filename = '호필스튜디오_전체백업_' + getTodayStr() + '.json';
   _downloadJson(data, filename);
   toast('전체 백업 다운로드를 요청했습니다. 다운로드 목록에서 파일을 확인해주세요.');
+  return true;
 }
 
 async function exportCurrentProject() {
@@ -13454,7 +13455,7 @@ window.addEventListener('popstate', e => {
 
 // PWA Service Worker 등록
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  window.addEventListener('load', () => {
+  const registerServiceWorker = () => {
     navigator.serviceWorker.register('./sw.js', { scope: './' })
       .then(reg => {
         reg.addEventListener('updatefound', () => {
@@ -13468,7 +13469,9 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
         setInterval(() => { reg.update().catch(() => {}); }, 60000);
       })
       .catch(e => {});
-  });
+  };
+  if (document.readyState === 'complete') registerServiceWorker();
+  else window.addEventListener('load', registerServiceWorker, { once: true });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -13532,15 +13535,10 @@ function dismissBackupBanner() {
 }
 
 // 전체 작품 백업 (모든 작품을 하나의 JSON으로)
-function backupAllAndClose() {
-  const blob = new Blob([JSON.stringify(state.projects, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = '웹소설스튜디오_전체백업_' + new Date().toISOString().slice(0,10) + '.json';
-  a.click();
+async function backupAllAndClose() {
+  if (await exportAllProjects() !== true) return;
   setLastBackupTime();
   dismissBackupBanner();
-  toast('전체 백업 완료! 📁');
 }
 
 // exportData도 백업 시간 기록하도록 오버라이드

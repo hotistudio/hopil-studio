@@ -139,8 +139,9 @@
 
   const _origSaveToStorage = window.saveToStorage;
   window.saveToStorage = function () {
-    _origSaveToStorage.apply(this, arguments);
+    const savedLocally = _origSaveToStorage.apply(this, arguments);
     ensureHandlePermissions().catch(() => {});
+    return savedLocally;
   };
 
   async function ensureHandlePermissions() {

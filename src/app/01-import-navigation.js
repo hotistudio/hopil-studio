@@ -6,6 +6,7 @@ async function exportAllProjects() {
   const filename = '호필스튜디오_전체백업_' + getTodayStr() + '.json';
   _downloadJson(data, filename);
   toast('전체 백업 다운로드를 요청했습니다. 다운로드 목록에서 파일을 확인해주세요.');
+  return true;
 }
 
 async function exportCurrentProject() {

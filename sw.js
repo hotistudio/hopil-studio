@@ -3,7 +3,7 @@
 // 오프라인 지원 + 리소스 캐싱
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'hopil-v0.7.28-20261110';
+const CACHE_VERSION = 'hopil-v0.7.29-20261114';
 const CACHE_NAME = `hopil-studio-${CACHE_VERSION}`;
 
 // 앱 셸 — 설치 시 미리 캐시할 리소스
@@ -15,20 +15,21 @@ const APP_SHELL = [
   './icons/icon-512.png?v=0.7.9',
   './assets/hwpx-template.json',
   './styles/fonts.css',
-  './styles/app.css?v=0.7.28',
+  './styles/app.css?v=0.7.29',
   './scripts/errors.js',
-  './scripts/app.js?v=0.7.28',
+  './scripts/session-guard.js?v=0.7.29',
+  './scripts/app.js?v=0.7.29',
   './scripts/extension-01.js?v=0.7.6',
-  './scripts/extension-02.js',
-  './scripts/extension-03.js?v=0.7.28',
+  './scripts/extension-02.js?v=0.7.29',
+  './scripts/extension-03.js?v=0.7.29',
   './scripts/extension-04.js',
   './scripts/extension-05.js',
   './scripts/extension-06.js',
-  './scripts/extension-07.js?v=0.7.28',
+  './scripts/extension-07.js?v=0.7.29',
   './scripts/extension-08.js',
   './scripts/extension-09.js',
   './scripts/extension-10.js',
-  './scripts/typewriter-scroll.js?v=0.7.28',
+  './scripts/typewriter-scroll.js?v=0.7.29',
 ];
 
 // ─── INSTALL: 앱 셸 캐시 ─────────────────────────────────────────
