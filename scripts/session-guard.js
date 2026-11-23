@@ -4,7 +4,7 @@
   'use strict';
 
   const screen = document.createElement('div');
-  screen.style.cssText = 'position:fixed;inset:0;z-index:100000;background:var(--paper,#fff);color:var(--ink,#222);display:grid;place-items:center;padding:24px';
+  screen.style.cssText = 'position:fixed;inset:0;z-index:100000;background:var(--paper,#fff);color:var(--ink,#222);display:none;place-items:center;padding:24px';
   screen.innerHTML = '<div style="max-width:420px;line-height:1.8"><h2>호필 스튜디오</h2><p role="status"></p><button type="button" class="btn btn-primary">다시 시도</button></div>';
   document.body.appendChild(screen);
   const message = screen.querySelector('p');
@@ -29,9 +29,10 @@
 
   async function start() {
     retry.disabled = true;
-    message.textContent = '저장 공간을 확인하고 있습니다.';
+    screen.style.display = 'none';
     if (!navigator.locks) {
       message.textContent = '이 환경에서는 여러 창의 저장 충돌을 방지할 수 없습니다. 최신 브라우저에서 공개 페이지를 열어주세요.';
+      screen.style.display = 'grid';
       retry.disabled = false;
       return;
     }
@@ -39,6 +40,7 @@
       await navigator.locks.request('hopil-studio-editor', { ifAvailable: true }, async lock => {
         if (!lock) {
           message.textContent = '다른 창에서 호필 스튜디오를 사용하고 있습니다. 그 창을 닫은 뒤 다시 시도하면 최신 원고를 불러옵니다.';
+          screen.style.display = 'grid';
           retry.disabled = false;
           return;
         }
@@ -48,6 +50,7 @@
           message.textContent = '앱을 불러오지 못했습니다. 연결 상태를 확인한 뒤 새로고침해주세요.';
           retry.textContent = '새로고침';
           retry.onclick = () => location.reload();
+          screen.style.display = 'grid';
           retry.disabled = false;
         }
         // 부분 초기화에 실패해도 이미 실행된 타이머가 있으므로 잠금을 유지한다.
@@ -55,6 +58,7 @@
       });
     } catch (error) {
       message.textContent = '저장 공간 잠금을 확인하지 못했습니다. 다시 시도해주세요.';
+      screen.style.display = 'grid';
       retry.disabled = false;
     }
   }
