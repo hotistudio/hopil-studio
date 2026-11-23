@@ -70,7 +70,11 @@ function refreshSecondEditor(prefix = '', remember = true) {
   if (!chapter) { secondEditorChapters.delete(project); return; }
   secondEditorChapters.set(project, chapter.id);
   const select = document.getElementById(prefix + 'second-chapter-select');
-  select.replaceChildren(...choices.map(item => new Option(item.title, item.id, false, item.id === chapter.id)));
+  select.replaceChildren(...choices.map(item => {
+    const folder = (project.chapterFolders || []).find(folder => folder.id === item.folderId);
+    const label = `[${folder ? folder.name : '폴더 없음'}] ${item.title}`;
+    return new Option(label, item.id, false, item.id === chapter.id);
+  }));
   const editor = document.getElementById(prefix + 'second-prose-editor');
   editor.value = chapter.content || '';
   bindManuscriptEditor(editor, chapter);
